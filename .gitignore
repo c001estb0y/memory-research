@@ -1,0 +1,26 @@
+# Clone 下来的源码仓库（参考用，不提交）
+/MemOS/
+/OpenViking/
+/claude-mem/
+/codebuddy-mem/
+/deepseek-tokenizer/
+/mem0/
+/memU/
+/openclaw/
+/supermemory/
+
+# IDE & OS
+.cursor/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
