@@ -1,26 +1,17 @@
-# Clone 下来的源码仓库（参考用，不提交）
-/MemOS/
-/OpenViking/
-/claude-mem/
-/codebuddy-mem/
-/deepseek-tokenizer/
-/mem0/
-/memU/
-/openclaw/
-/supermemory/
+# 敏感配置
+.env
+*.env.local
 
-# IDE & OS
-.cursor/
-.vscode/
+# Node.js
+node_modules/
+package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
 *.swp
 *.swo
-Thumbs.db
-.DS_Store
-
-# Node
-node_modules/
-
-# Python
-__pycache__/
-*.pyc
-.venv/
