@@ -359,32 +359,54 @@ utils/hooks.ts → executeHooks()
 
 ---
 
-## 八、与 claude-mem 插件协同示例
+## 八、与 claude-mem 插件协同（基于 v10.6.3 源码）
 
-假设有一个 `claude-mem` 插件，提供了知识库管理功能（向量存储、自动索引、上下文增强）。以下展示 hooks 如何与这类记忆插件深度协同。
+> 以下内容基于 `claude-mem` 开源仓库（`github.com/thedotmack/claude-mem` v10.6.3）的实际源码分析，而非推测。
 
-### 8.1 场景描述
+### 8.1 claude-mem 真实架构
 
-`claude-mem` 插件的核心能力：
-- 将代码变更自动索引到本地向量数据库
-- 在用户提问时检索相关历史上下文
-- 在会话结束时提取关键知识点
+`claude-mem` 不是简单的"向量数据库索引"插件，而是一个**带 Observer AI 的持久化记忆系统**：
 
-### 8.2 配置文件
+| 组件 | 实现 | 职责 |
+|------|------|------|
+| **Worker Service** | Express HTTP 服务，默认 `127.0.0.1:37777` | 核心守护进程，管理会话、存储、搜索、Agent |
+| **Observer AI（SDK Agent）** | Claude Agent SDK，独立于主 Claude Code 的 LLM 调用 | "旁观者 AI"，接收工具观察和 transcript 片段，生成结构化 XML 记忆 |
+| **SQLite 存储** | `bun:sqlite` + FTS5 虚拟表 | 主存储：`observations`、`session_summaries`、`user_prompts` 表 |
+| **Chroma 向量** | 通过 `uvx chroma-mcp` 子进程 | 语义搜索：将 SQLite 中的观测/摘要同步为向量 |
+| **MCP Server** | `@modelcontextprotocol/sdk` + stdio | 对 Claude Code 暴露 `search`/`timeline`/`get_observations`/`smart_search` 等工具 |
+| **Web Viewer** | React SPA + SSE | `http://localhost:37777` 实时展示观测和摘要 |
 
-在 `.claude/settings.json` 中配置 hooks：
+关键区别：claude-mem **不是**直接对文件做向量索引——而是由一个独立的 Observer AI 将每次工具调用**蒸馏**为结构化的 `<observation>` XML（包含 type、title、facts、narrative、concepts、files 等字段），然后存入 SQLite 并异步同步到 Chroma。
+
+### 8.2 真实的 Hooks 配置
+
+claude-mem 通过 `plugin/hooks/hooks.json` 注册 hooks，**不在用户的 `.claude/settings.json` 中配置**，而是由插件系统自动加载。实际配置如下（简化展示核心逻辑）：
 
 ```json
 {
   "hooks": {
+    "Setup": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "$PLUGIN_ROOT/scripts/setup.sh", "timeout": 300 }
+        ]
+      }
+    ],
+
     "SessionStart": [
       {
+        "matcher": "startup|clear|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "claude-mem init --session $SESSION_ID --cwd $CWD",
-            "timeout": 10,
-            "statusMessage": "Initializing memory index..."
+            "command": "node $PLUGIN_ROOT/scripts/bun-runner.js $PLUGIN_ROOT/scripts/worker-service.cjs start",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "node $PLUGIN_ROOT/scripts/bun-runner.js $PLUGIN_ROOT/scripts/worker-service.cjs hook claude-code context",
+            "timeout": 60
           }
         ]
       }
@@ -395,9 +417,8 @@ utils/hooks.ts → executeHooks()
         "hooks": [
           {
             "type": "command",
-            "command": "claude-mem retrieve --query \"$(cat)\" --top-k 5 --format json",
-            "timeout": 5,
-            "statusMessage": "Searching knowledge base..."
+            "command": "... worker-service.cjs hook claude-code session-init",
+            "timeout": 60
           }
         ]
       }
@@ -405,38 +426,12 @@ utils/hooks.ts → executeHooks()
 
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "claude-mem index-file --stdin",
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "claude-mem capture-output --stdin",
-            "if": "Bash(npm test *)",
-            "async": true
-          }
-        ]
-      }
-    ],
-
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "prompt",
-            "prompt": "检查以下文件修改是否与知识库中的已知约定冲突。文件操作：$ARGUMENTS。如果发现潜在冲突，返回 {\"ok\": false, \"reason\": \"冲突描述\"}，否则返回 {\"ok\": true}。",
-            "model": "claude-sonnet-4-6",
-            "timeout": 10,
-            "statusMessage": "Checking against knowledge base..."
+            "command": "... worker-service.cjs hook claude-code observation",
+            "timeout": 120
           }
         ]
       }
@@ -447,23 +442,8 @@ utils/hooks.ts → executeHooks()
         "hooks": [
           {
             "type": "command",
-            "command": "claude-mem extract-learnings --session $SESSION_ID --transcript $TRANSCRIPT_PATH",
-            "timeout": 30,
-            "async": true,
-            "statusMessage": "Extracting session learnings..."
-          }
-        ]
-      }
-    ],
-
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "claude-mem flush --session $SESSION_ID --reason pre-compact",
-            "timeout": 15,
-            "statusMessage": "Flushing memory before compaction..."
+            "command": "... worker-service.cjs hook claude-code summarize",
+            "timeout": 120
           }
         ]
       }
@@ -474,9 +454,8 @@ utils/hooks.ts → executeHooks()
         "hooks": [
           {
             "type": "command",
-            "command": "claude-mem sync --session $SESSION_ID",
-            "timeout": 20,
-            "statusMessage": "Syncing memory to persistent store..."
+            "command": "node -e \"...POST http://127.0.0.1:37777/api/sessions/complete...\"",
+            "timeout": 5
           }
         ]
       }
@@ -485,91 +464,140 @@ utils/hooks.ts → executeHooks()
 }
 ```
 
-### 8.3 工作流全景
+注意与原文档的**重大差异**：
+- **没有 PreToolUse hook**——不存在"知识库冲突检查"功能
+- **没有 PreCompact hook**——不存在"压缩前 flush"功能
+- **没有独立的 CLI 命令**——所有命令都通过 `worker-service.cjs hook claude-code <event>` 调用
+- **只有 6 个事件**（Setup、SessionStart、UserPromptSubmit、PostToolUse、Stop、SessionEnd），不是原文描述的 7 个
+- 所有 hook 都是同步 `command` 类型，不是异步的
+
+### 8.3 真实工作流全景
 
 ```
+插件安装后首次启动
+  │
+  ├── [Setup] setup.sh
+  │   → 检查依赖（Bun 等），安装必要运行时
+  │
+  ▼
 会话开始
   │
-  ├── [SessionStart] claude-mem init
-  │   → 初始化向量索引，加载项目知识库
+  ├── [SessionStart] worker-service.cjs start
+  │   → 启动 Worker 守护进程（Express HTTP，端口 37777）
+  │   → Worker 初始化：SQLite 连接、Chroma MCP 子进程、MCP 客户端
+  │   → 以 detached 进程运行，避免被 Claude Code 沙箱杀掉
+  │
+  ├── [SessionStart] hook claude-code context
+  │   → contextHandler 调用 GET /api/context/inject
+  │   → ContextBuilder 从 SQLite 查询本项目的历史观测和摘要
+  │   → 按时间线组织，计算 token 预算，渲染为 Markdown
+  │   → 通过 hook 的 additionalContext 输出注入到 Claude Code 的上下文中
+  │   → 模型在会话开始时就能"看到"之前的记忆
   │
   ▼
 用户输入 "修复购物车并发问题"
   │
-  ├── [UserPromptSubmit] claude-mem retrieve
-  │   → 搜索知识库："购物车并发"相关知识
-  │   → 返回上下文：之前的并发修复方案、相关文件路径等
-  │   → 模型获得增强上下文，做出更好决策
+  ├── [UserPromptSubmit] hook claude-code session-init
+  │   → sessionInitHandler 调用 POST /api/sessions/init
+  │   → 在 SQLite 中创建/更新会话记录，存储用户提示语
+  │   → 如果是第一个 prompt（promptNumber=1），启动 SDK Agent（Observer AI）
+  │   → Observer AI 收到 buildInitPrompt，进入观察待命状态
   │
   ▼
-模型决定修改 src/cart/service.ts
+模型调用 FileRead 读取 src/cart/service.ts
   │
-  ├── [PreToolUse: Write] prompt hook
-  │   → LLM 检查：这个修改是否与知识库中已知的 "购物车模块不能用 
-  │     乐观锁" 这条约定冲突？
-  │   → 返回 { ok: false, reason: "知识库记录：购物车模块必须用 
-  │     悲观锁，因为高并发下乐观锁重试导致 CPU 飙升" }
-  │   → 模型收到反馈，改用悲观锁方案
-  │
-  ▼
-模型写入文件（悲观锁版本）
-  │
-  ├── [PostToolUse: Write] claude-mem index-file (async)
-  │   → 后台异步将修改后的文件索引到向量数据库
-  │   → 不阻塞模型继续工作
-  │
-  ▼
-模型运行测试
-  │
-  ├── [PostToolUse: Bash] claude-mem capture-output (async, if: npm test)
-  │   → 后台捕获测试输出，索引到知识库
-  │   → 记录 "购物车并发测试通过" 这一事实
+  ├── [PostToolUse] hook claude-code observation
+  │   → observationHandler 调用 POST /api/sessions/observations
+  │   → 将 {tool_name: "FileRead", tool_input, tool_response} 发给 Worker
+  │   → Worker 将工具观察包装为 XML 发给 Observer AI：
+  │     <observed_from_primary_session>
+  │       <what_happened>FileRead</what_happened>
+  │       <parameters>{"path": "src/cart/service.ts"}</parameters>
+  │       <outcome>文件内容...</outcome>
+  │     </observed_from_primary_session>
+  │   → Observer AI 判断是否值得记录，如果值得则输出：
+  │     <observation>
+  │       <type>code_analysis</type>
+  │       <title>Cart service uses optimistic locking</title>
+  │       <facts><fact>getCart() uses version field for optimistic lock</fact></facts>
+  │       <files_read><file>src/cart/service.ts</file></files_read>
+  │     </observation>
+  │   → ResponseProcessor 解析 XML → 事务写入 SQLite → 异步同步到 Chroma
+  │   → SSE 广播到 Web Viewer（如果打开了 localhost:37777）
   │
   ▼
-回合结束
+模型修改文件、运行测试（每次 PostToolUse 都重复上述流程）
   │
-  ├── [Stop] claude-mem extract-learnings (async)
-  │   → 从 transcript 中提取关键学习点：
-  │     - "购物车模块的并发问题用悲观锁解决"
-  │     - "service.ts 中 getCart() 需要 SELECT FOR UPDATE"
-  │   → 写入知识库供未来会话使用
+  ├── [PostToolUse] 每次工具调用后都触发 observation
+  │   → Observer AI 持续观察，选择性记录有价值的工具操作
+  │   → 不是所有操作都会产生 observation（AI 判断是否值得记录）
   │
   ▼
-上下文快要满了
+回合结束（模型不再调用工具）
   │
-  ├── [PreCompact] claude-mem flush
-  │   → 在压缩前将当前会话的重要信息 flush 到持久存储
-  │   → 确保压缩不会丢失关键知识
+  ├── [Stop] hook claude-code summarize
+  │   → summarizeHandler 从 transcript 文件提取最后一条 assistant 消息
+  │   → 调用 POST /api/sessions/summarize
+  │   → Observer AI 收到 buildSummaryPrompt，生成进度摘要：
+  │     <summary>
+  │       <request>修复购物车并发问题</request>
+  │       <investigated>分析了 service.ts 中的锁机制</investigated>
+  │       <learned>乐观锁在高并发下导致 CPU 飙升</learned>
+  │       <completed>改用悲观锁（SELECT FOR UPDATE）</completed>
+  │       <next_steps>需要压力测试验证</next_steps>
+  │     </summary>
+  │   → 解析并存入 SQLite + Chroma
   │
   ▼
 会话结束
   │
-  └── [SessionEnd] claude-mem sync
-      → 将本地索引同步到持久存储
-      → 下次会话可以检索到本次的知识
+  └── [SessionEnd] POST /api/sessions/complete
+      → 标记会话为已完成
+      → 下次新会话的 SessionStart context hook 能检索到本次的记忆
 ```
 
-### 8.4 关键协同模式解析
+### 8.4 真实协同模式解析
 
-**模式一：上下文增强（UserPromptSubmit → retrieve）**
+**模式一：会话启动时的记忆注入（SessionStart → context）**
 
-用户提问时，hook 从知识库检索相关上下文，通过 stdout JSON 注入给模型。模型看到的不仅是用户的问题，还有历史积累的相关知识。
+这是 claude-mem 的核心价值——在会话开始时，通过 `additionalContext` 将历史记忆注入上下文。`ContextBuilder` 从 SQLite 查询本项目最近的观测和摘要，按时间线组织，控制 token 预算后渲染为 Markdown。模型在第一轮对话时就已经"记得"之前做过什么。
 
-**模式二：预防性检查（PreToolUse → prompt hook）**
+**模式二：Observer AI 蒸馏（PostToolUse → observation）**
 
-在修改文件前，用 LLM 检查是否与知识库中的已知约定冲突。这实现了「组织记忆的自动执行」——团队曾经踩过的坑不会再踩。
+这是 claude-mem 与简单"文件索引"方案的核心区别。不是程序化地把 tool_result 存入向量库——而是由一个**独立的 Observer AI** 判断每次工具调用是否值得记录，并将其蒸馏为结构化的 observation（包含 type、title、facts、narrative、concepts、files 等字段）。这相当于一个"旁观者"在旁边做笔记，只记有价值的内容。
 
-**模式三：异步索引（PostToolUse → async command）**
+**模式三：回合摘要生成（Stop → summarize）**
 
-文件修改后异步索引到向量数据库。`async: true` 确保不阻塞主流程，但知识在后续查询中可用。
+每个回合结束时，从 transcript 提取最后一条 assistant 消息，发给 Observer AI 生成结构化摘要（request → investigated → learned → completed → next_steps → notes）。这些摘要在下次 SessionStart 时被检索出来，形成跨回合的连续记忆。
 
-**模式四：压缩前 flush（PreCompact → flush）**
+**模式四：三层渐进式检索（MCP → search → timeline → get_observations）**
 
-上下文压缩前将重要信息写入外部存储。这解决了纯 in-context memory 的核心问题——压缩可能丢失关键信息。
+claude-mem 注册的 MCP Server 暴露 7 个工具给 Claude Code。核心检索遵循三层工作流：
+1. `search(query)` → 返回索引级结果（ID + 标题，每条约 50-100 token）
+2. `timeline(anchor=ID)` → 围绕某条结果展示时间上下文
+3. `get_observations(ids=[...])` → 按需获取完整详情（每条约 500-1000 token）
 
-**模式五：会话结束提取（Stop → extract-learnings）**
+这种分层设计使 token 消耗减少约 10 倍。此外还有 `smart_search`/`smart_unfold`/`smart_outline` 三个基于 tree-sitter AST 解析的本地代码搜索工具。
 
-回合结束时从 transcript 中提取结构化知识点。这是 Claude Code 自身 `extractMemories` 的外部扩展——插件可以用自己的格式和存储。
+**模式五：Web Viewer 实时监控**
+
+Worker 在 `localhost:37777` 提供 React Web UI，通过 SSE（`/stream`）实时推送新的 observation 和 summary。开发者可以在浏览器中实时查看 Observer AI 在"记"什么。
+
+### 8.5 claude-mem 与文档其他章节描述的差异
+
+| 原文描述 | 实际情况 |
+|---------|---------|
+| `claude-mem init --session` | 不存在。通过 `worker-service.cjs start` 启动 Worker |
+| `claude-mem retrieve --query` | 不存在。检索通过 MCP Server 的 `search` 工具完成 |
+| `claude-mem index-file --stdin` | 不存在。PostToolUse 将工具调用发给 Observer AI 蒸馏 |
+| `claude-mem capture-output` | 不存在。所有工具输出统一走 observation 流程 |
+| `claude-mem extract-learnings` | 不存在。Stop hook 调用 `/api/sessions/summarize` |
+| `claude-mem flush` | 不存在。无 PreCompact hook |
+| `claude-mem sync` | 不存在。SessionEnd 调用 `/api/sessions/complete` |
+| PreToolUse 知识库冲突检查 | 不存在。无 PreToolUse hook |
+| PreCompact 压缩前 flush | 不存在。无 PreCompact hook |
+| 文件变更异步索引到向量库 | 不是简单索引，而是 Observer AI 蒸馏为结构化 XML |
+| UserPromptSubmit 检索注入 | 上下文注入在 SessionStart，不在 UserPromptSubmit |
 
 ---
 
@@ -685,19 +713,18 @@ utils/hooks.ts → executeHooks()
 
 #### 特性三：记忆与知识库
 
-> 本文档第八章详细展示的核心场景——hooks 驱动外部记忆系统。
+> 本文档第八章基于 claude-mem v10.6.3 源码详细展示了真实的 hooks 驱动记忆系统。
 
 | 能力 | 依赖的 Hook | Cursor | Claude Code |
 |------|------------|--------|-------------|
-| 会话开始时加载知识库 | sessionStart / SessionStart | ✅ | ✅ |
-| 用户提问时检索相关上下文 | beforeSubmitPrompt / UserPromptSubmit | ✅ | ✅ |
-| 文件变更后异步索引 | PostToolUse + `async: true` | ❌ | ✅ |
-| 压缩前 flush 关键信息 | preCompact / PreCompact | ✅ | ✅ |
-| 回合结束提取学习点 | stop / Stop | ✅ | ✅ |
-| 会话结束同步持久化 | sessionEnd / SessionEnd | ✅ | ✅ |
-| 将事件推送到外部知识服务 | http 类型 hook | ❌ | ✅ |
+| 会话开始时注入历史记忆 | sessionStart / SessionStart | ✅ | ✅（claude-mem 实际使用此模式） |
+| 工具调用后 Observer AI 蒸馏 | PostToolUse | ❌ | ✅（claude-mem 实际使用此模式） |
+| 回合结束生成进度摘要 | stop / Stop | ✅ | ✅（claude-mem 实际使用此模式） |
+| 会话结束标记完成 | sessionEnd / SessionEnd | ✅ | ✅（claude-mem 实际使用此模式） |
+| 通过 MCP 工具检索记忆 | MCP Server 注册 | ✅ | ✅（claude-mem 的主要检索方式） |
+| 将事件推送到外部知识服务 | http 类型 hook | ❌ | ✅（hooks 支持但 claude-mem 未使用） |
 
-> Claude Code 的 `async` + `http` 组合使其在记忆插件场景上有明显优势：异步索引不阻塞，HTTP webhook 可直接对接远程向量数据库。
+> **注意**：claude-mem 实际上没有使用 PreCompact（压缩前 flush）、PreToolUse（冲突检查）或 async hook。它的所有 hook 都是同步 command 类型，通过 Worker HTTP API 与守护进程通信。记忆检索主要通过 MCP Server 暴露的 `search`/`timeline`/`get_observations` 工具完成，而非 hook stdout 注入。
 
 #### 特性四：审计与可观测性
 
