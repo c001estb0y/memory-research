@@ -15,3 +15,17 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Third-party cloned source repos (root-level only)
+/ClaudeCode/
+/ClawXMemory/
+/MemOS/
+/OpenViking/
+/claude-mem/
+/codebuddy-mem/
+/deepseek-tokenizer/
+/graphiti/
+/mem0/
+/memU/
+/openclaw/
+/supermemory/
