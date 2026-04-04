@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graphiti 知识图谱 — codebuddy-mem 记忆数据</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Share+Tech+Mono&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-void: #020810;
+    --bg-surface: #06101e;
+    --bg-elevated: #0a1628;
+    --bg-card: #081220;
+
+    /* ── Blue Spectrum ── */
+    --blue-electric: #00c8ff;
+    --blue-electric-glow: rgba(0, 200, 255, 0.4);
+
+    --blue-ice: #64e4ff;
+    --blue-ice-glow: rgba(100, 228, 255, 0.35);
+
+    --blue-deep: #3a7bff;
+    --blue-deep-glow: rgba(58, 123, 255, 0.4);
+
+    --blue-violet: #6e5cff;
+    --blue-violet-glow: rgba(110, 92, 255, 0.35);
+
+    --blue-steel: #4a90d9;
+    --blue-steel-glow: rgba(74, 144, 217, 0.3);
+
+    --accent: #00c8ff;
+    --accent-bright: #64e4ff;
+    --accent-glow: rgba(0, 200, 255, 0.35);
+
+    --text-primary: #c8d8f0;
+    --text-secondary: #7088b0;
+    --text-tertiary: #3a5078;
+    --text-faint: #1e3050;
+
+    --grid-line: rgba(0, 200, 255, 0.025);
+    --border: rgba(0, 200, 255, 0.08);
+    --border-hover: rgba(0, 200, 255, 0.22);
+
+    --edge-default: #142240;
+    --edge-expired: #0c1628;
+  }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: 'Exo 2', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+
+  /* ── Background ── */
+  #graph-container {
+    flex: 1;
+    position: relative;
+    background:
+      radial-gradient(ellipse 60% 50% at 12% 30%, rgba(0,200,255,0.03) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 82% 55%, rgba(58,123,255,0.025) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 35% at 50% 12%, rgba(110,92,255,0.03) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 80% at 50% 85%, rgba(0,200,255,0.012) 0%, transparent 70%),
+      var(--bg-void);
+  }
+
+  /* Grid */
+  #graph-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, var(--grid-line) 0px, transparent 1px, transparent 80px),
+      repeating-linear-gradient(90deg, var(--grid-line) 0px, transparent 1px, transparent 80px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanline */
+  #graph-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(180deg, transparent 0px, rgba(0,0,0,0.012) 2px, transparent 4px);
+    pointer-events: none;
+    z-index: 0;
+    animation: scanMove 8s linear infinite;
+  }
+  @keyframes scanMove {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(4px); }
+  }
+
+  svg { width: 100%; height: 100%; position: relative; z-index: 1; }
+  .node-glow { filter: url(#glow); }
+
+  /* ── Detail Panel ── */
+  #detail-panel {
+    width: 400px;
+    min-width: 400px;
+    background: linear-gradient(175deg, var(--bg-surface) 0%, #030a14 100%);
+    border-left: 1px solid var(--border);
+    padding: 36px 28px;
+    overflow-y: auto;
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: -30px 0 80px rgba(0, 0, 0, 0.6);
+    position: relative;
+  }
+  #detail-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--blue-deep), var(--blue-electric), var(--blue-ice));
+    opacity: 0.5;
+  }
+  #detail-panel::-webkit-scrollbar { width: 3px; }
+  #detail-panel::-webkit-scrollbar-track { background: transparent; }
+  #detail-panel::-webkit-scrollbar-thumb { background: var(--blue-deep); border-radius: 3px; opacity: 0.5; }
+  #detail-panel::-webkit-scrollbar-thumb:hover { background: var(--blue-electric); }
+
+  #detail-panel.hidden {
+    transform: translateX(100%);
+    width: 0; min-width: 0; padding: 0;
+    border: none; overflow: hidden; box-shadow: none;
+  }
+
+  #detail-panel h2 {
+    font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #fff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px var(--accent-glow);
+  }
+  #detail-panel .type-badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-bottom: 22px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+  #detail-panel .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--blue-electric);
+    margin: 30px 0 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-shadow: 0 0 8px var(--blue-electric-glow);
+  }
+  #detail-panel .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(0,200,255,0.2), transparent);
+  }
+  #detail-panel .fact-text {
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--text-secondary);
+    background: linear-gradient(135deg, rgba(6,16,30,0.95), rgba(4,12,24,0.95));
+    padding: 18px 20px;
+    border-radius: 4px;
+    border-left: 2px solid var(--blue-electric);
+    margin-bottom: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 0 30px rgba(0,200,255,0.015);
+    position: relative;
+  }
+  #detail-panel .fact-text::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 2px; height: 100%;
+    background: var(--blue-electric);
+    box-shadow: 0 0 8px var(--blue-electric-glow), 0 0 20px var(--blue-electric-glow);
+  }
+  #detail-panel .meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 11px 0;
+    border-bottom: 1px solid rgba(20,34,64,0.5);
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+  #detail-panel .meta-row:hover {
+    background: rgba(0,200,255,0.03);
+    margin: 0 -10px;
+    padding: 11px 10px;
+    border-radius: 4px;
+  }
+  #detail-panel .meta-row .label { color: var(--text-tertiary); font-weight: 500; letter-spacing: 0.3px; }
+  #detail-panel .meta-row .value {
+    color: var(--text-secondary);
+    text-align: right;
+    max-width: 220px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+  }
+
+  #detail-panel .edge-list-item {
+    background: linear-gradient(135deg, rgba(6,16,30,0.8), rgba(4,12,24,0.8));
+    padding: 15px 18px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    border: 1px solid rgba(0,200,255,0.05);
+    position: relative;
+    overflow: hidden;
+  }
+  #detail-panel .edge-list-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0;
+    background: linear-gradient(90deg, rgba(0,200,255,0.08), transparent);
+    transition: width 0.3s;
+  }
+  #detail-panel .edge-list-item:hover::before { width: 100%; }
+  #detail-panel .edge-list-item:hover {
+    border-color: var(--border-hover);
+    transform: translateX(6px);
+    box-shadow: 0 0 20px rgba(0,200,255,0.06), inset 0 0 20px rgba(0,200,255,0.02);
+  }
+  #detail-panel .edge-list-item .rel {
+    color: var(--blue-ice);
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+    text-shadow: 0 0 6px var(--blue-ice-glow);
+  }
+  #detail-panel .edge-list-item .target { color: var(--text-secondary); margin-left: 8px; position: relative; z-index: 1; }
+
+  #close-panel {
+    position: absolute;
+    top: 20px;
+    right: 18px;
+    background: rgba(0,200,255,0.04);
+    border: 1px solid rgba(0,200,255,0.12);
+    color: var(--text-tertiary);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    width: 34px;
+    height: 34px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s;
+  }
+  #close-panel:hover {
+    color: var(--blue-ice);
+    background: rgba(0,200,255,0.08);
+    border-color: rgba(0,200,255,0.35);
+    box-shadow: 0 0 16px rgba(0,200,255,0.12);
+    text-shadow: 0 0 8px var(--blue-electric-glow);
+  }
+
+  /* ── Legend ── */
+  #legend {
+    position: absolute;
+    top: 28px;
+    left: 28px;
+    background: rgba(3, 10, 20, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+    font-size: 13px;
+    pointer-events: none;
+    backdrop-filter: blur(24px) saturate(1.3);
+    box-shadow: 0 0 40px rgba(0,0,0,0.4), inset 0 0 40px rgba(0,200,255,0.015);
+    z-index: 10;
+    position: relative;
+  }
+  #legend::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--blue-deep), var(--blue-electric), var(--blue-ice));
+    opacity: 0.4;
+  }
+  #legend .title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--blue-electric);
+    margin-bottom: 16px;
+    font-weight: 700;
+    text-shadow: 0 0 10px var(--blue-electric-glow);
+  }
+  #legend .item { display: flex; align-items: center; margin-bottom: 11px; }
+  #legend .item:last-child { margin-bottom: 0; }
+  #legend .dot {
+    width: 6px; height: 6px; margin-right: 14px; flex-shrink: 0;
+    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+  #legend .item-label {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-size: 12px;
+    font-family: 'Exo 2', 'Noto Sans SC', sans-serif;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Stats Bar ── */
+  #stats-bar {
+    position: absolute;
+    top: 28px;
+    right: 28px;
+    display: flex;
+    gap: 10px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .stat-chip {
+    background: rgba(3, 10, 20, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 18px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    backdrop-filter: blur(24px) saturate(1.3);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    font-family: 'Exo 2', sans-serif;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-chip::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--blue-electric), transparent);
+    opacity: 0.25;
+  }
+  .stat-chip .stat-num {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    text-shadow: 0 0 12px var(--blue-electric-glow);
+  }
+
+  /* ── Title ── */
+  #title-bar {
+    position: absolute;
+    bottom: 32px;
+    left: 32px;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+  }
+  #title-bar .main-title {
+    font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-shadow: 0 0 20px var(--blue-electric-glow);
+  }
+  #title-bar .main-title .logo-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--blue-electric);
+    box-shadow: 0 0 12px var(--blue-electric-glow), 0 0 30px var(--blue-electric-glow);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 12px var(--blue-electric-glow), 0 0 30px var(--blue-electric-glow); }
+    50% { opacity: 0.3; box-shadow: 0 0 4px var(--blue-electric-glow); }
+  }
+  #title-bar .sub-title {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-left: 20px;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    font-family: 'Share Tech Mono', monospace;
+    text-transform: uppercase;
+  }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(3, 10, 20, 0.96);
+    border: 1px solid var(--border-hover);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-width: 320px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 100;
+    backdrop-filter: blur(24px);
+    box-shadow: 0 0 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,200,255,0.04);
+  }
+
+  /* ── Keyboard Hints ── */
+  #keyboard-hint {
+    position: absolute;
+    bottom: 32px;
+    right: 32px;
+    display: flex;
+    gap: 14px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .kbd-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: 'Exo 2', sans-serif;
+  }
+  .kbd {
+    background: rgba(0,200,255,0.04);
+    border: 1px solid rgba(0,200,255,0.1);
+    border-radius: 2px;
+    padding: 3px 9px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--blue-steel);
+    text-shadow: 0 0 4px var(--blue-steel-glow);
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes glitchIn {
+    0% { opacity: 0; transform: translateX(-4px) skewX(-2deg); }
+    40% { opacity: 0.8; transform: translateX(2px) skewX(1deg); }
+    60% { opacity: 0.9; transform: translateX(-1px) skewX(0deg); }
+    100% { opacity: 1; transform: translateX(0) skewX(0deg); }
+  }
+  #legend { animation: glitchIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  #stats-bar { animation: glitchIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+  #title-bar { animation: glitchIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
+  #keyboard-hint { animation: fadeIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both; }
+</style>
+</head>
+<body>
+
+<div id="graph-container">
+  <svg id="graph-svg">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+        <feMerge>
+          <feMergeNode in="coloredBlur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+      <filter id="glow-strong" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="12" result="coloredBlur"/>
+        <feMerge>
+          <feMergeNode in="coloredBlur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+
+      <marker id="arrow" viewBox="0 0 10 6" refX="28" refY="3"
+              markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,3 L0,6 Z" fill="#142240"/>
+      </marker>
+      <marker id="arrow-highlight" viewBox="0 0 10 6" refX="28" refY="3"
+              markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,3 L0,6 Z" fill="#00c8ff"/>
+      </marker>
+    </defs>
+  </svg>
+
+  <div id="legend">
+    <div class="title">Node Types</div>
+    <div class="item"><div class="dot" style="background:#64e4ff;color:#64e4ff"></div><span class="item-label">人物 Person</span></div>
+    <div class="item"><div class="dot" style="background:#3a7bff;color:#3a7bff"></div><span class="item-label">技术 / 工具 Tech</span></div>
+    <div class="item"><div class="dot" style="background:#6e5cff;color:#6e5cff"></div><span class="item-label">文档 Document</span></div>
+  </div>
+
+  <div id="stats-bar">
+    <div class="stat-chip"><span class="stat-num" id="node-count">0</span>Nodes</div>
+    <div class="stat-chip"><span class="stat-num" id="edge-count">0</span>Edges</div>
+    <div class="stat-chip"><span class="stat-num" id="episode-count">0</span>Episodes</div>
+  </div>
+
+  <div id="title-bar">
+    <div class="main-title"><div class="logo-dot"></div>Graphiti Knowledge Graph</div>
+    <div class="sub-title">codebuddy-mem session data // chapter_06</div>
+  </div>
+
+  <div id="keyboard-hint">
+    <div class="kbd-item"><span class="kbd">Scroll</span> Zoom</div>
+    <div class="kbd-item"><span class="kbd">Drag</span> Move</div>
+    <div class="kbd-item"><span class="kbd">Click</span> Detail</div>
+  </div>
+
+  <div id="tooltip"></div>
+</div>
+
+<div id="detail-panel" class="hidden">
+  <button id="close-panel">&times;</button>
+  <div id="panel-content"></div>
+</div>
+
+<script>
+// ───────── Data ─────────
+const nodes = [
+  {
+    id: "minusjiang",
+    label: "minusjiang",
+    type: "person",
+    summary: "研究者，正在调研 AI Agent 长期记忆方案，包括 Mem0 和 Graphiti 的技术评估与对比。",
+    details: { "entity_type": "Person / User", "group_id": "memory-research" }
+  },
+  {
+    id: "Mem0",
+    label: "Mem0",
+    type: "tech",
+    summary: "通用 AI Agent 长期记忆开源方案，支持向量+图双轨存储。图记忆与关系抽取高度依赖 LLM 多阶段调用。社区评价显示存在记忆质量、成本和工程可用性方面的局限。",
+    details: { "entity_type": "Technology / Framework", "stars": "47.8K", "storage": "向量库 + 可选图（独立运行）" }
+  },
+  {
+    id: "LLM",
+    label: "LLM",
+    type: "tech",
+    summary: "大语言模型，Graphiti 和 Mem0 的核心依赖，用于实体抽取、事实抽取、去重判定、矛盾检测、实体摘要更新等多个环节。",
+    details: { "entity_type": "Technology", "调用次数/条": "Graphiti 3-5次, Mem0 4-5次" }
+  },
+  {
+    id: "Mem0_tech_doc",
+    label: "Mem0 技术方案文档",
+    type: "document",
+    summary: "minusjiang 撰写并多轮补充的 Mem0 技术方案分析文档，涵盖三段式写入管线、向量+图双轨存储架构等内容。",
+    details: { "entity_type": "Document", "format": "Markdown" }
+  },
+  {
+    id: "Mem0_community_doc",
+    label: "Mem0 社区评价文档",
+    type: "document",
+    summary: "minusjiang 编辑的关于 Mem0 社区评价与局限性的 Markdown 文档，重点在记忆效果、工程可用性、成本与稳定性等方面。",
+    details: { "entity_type": "Document", "format": "Markdown" }
+  },
+  {
+    id: "Graphiti",
+    label: "Graphiti",
+    type: "tech",
+    summary: "Zep 开源的知识图谱记忆引擎，使用统一图存储（Neo4j/FalkorDB），支持时序推理、三路混合检索和完整溯源。约 9K Stars。",
+    details: { "entity_type": "Technology / Framework", "stars": "~9K", "storage": "统一图（Neo4j/FalkorDB）" }
+  },
+  {
+    id: "Claude_Code",
+    label: "Claude Code",
+    type: "tech",
+    summary: "Anthropic 的 AI 编程助手，具备子代理（Subagent）编排机制和多种搜索工具（如 Grep）。",
+    details: { "entity_type": "Technology / Tool", "vendor": "Anthropic" }
+  },
+  {
+    id: "Grep",
+    label: "Grep",
+    type: "tech",
+    summary: "Claude Code 内置的搜索工具之一，用于在代码库中进行文本匹配搜索。",
+    details: { "entity_type": "Tool / Component" }
+  },
+  {
+    id: "Subagent",
+    label: "Subagent",
+    type: "tech",
+    summary: "Claude Code 的子代理组件，负责执行被委派的独立子任务，支持并行编排。",
+    details: { "entity_type": "Component" }
+  }
+];
+
+const edges = [
+  {
+    id: "e1",
+    source: "minusjiang", target: "Mem0",
+    relation: "EVALUATES",
+    fact: "minusjiang 正在搜索并整理社区对 Mem0 的评价及其局限性",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e2",
+    source: "Mem0", target: "LLM",
+    relation: "DEPENDS_ON",
+    fact: "Mem0 的图记忆与关系抽取高度依赖 LLM 多阶段调用",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e3",
+    source: "minusjiang", target: "Mem0_community_doc",
+    relation: "AUTHORED",
+    fact: "minusjiang 编辑了关于 Mem0 社区评价与局限性的 Markdown 文档",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e4",
+    source: "minusjiang", target: "Mem0_tech_doc",
+    relation: "UPDATED",
+    fact: "minusjiang 完成了 Mem0 技术方案相关文档的多轮补充",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e5",
+    source: "Mem0", target: "Graphiti",
+    relation: "COMPARED_WITH",
+    fact: "Mem0 与 Graphiti 被进行系统性技术对比，涵盖存储架构、时序能力、检索方式、溯源机制等多个维度",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e6",
+    source: "minusjiang", target: "Mem0",
+    relation: "RESEARCHES",
+    fact: "minusjiang 正在研究 Mem0 的三段式写入管线",
+    valid_at: "2026-04-02T13:47:53Z", invalid_at: "2026-04-02T14:02:17Z",
+    episodes: ["ep-2026-0402-1420"]
+  },
+  {
+    id: "e7",
+    source: "minusjiang", target: "Claude_Code",
+    relation: "RESEARCHES",
+    fact: "minusjiang 正在研究 Claude Code 的子代理编排机制",
+    valid_at: "2026-03-31T13:25:00Z", invalid_at: "2026-04-02T13:47:53Z",
+    episodes: ["ep-2026-0331-1400"]
+  },
+  {
+    id: "e8",
+    source: "Claude_Code", target: "Grep",
+    relation: "HAS_TOOL",
+    fact: "Claude Code 具备 Grep 搜索工具，用于代码库中的文本匹配",
+    valid_at: "2026-03-31T13:25:00Z", invalid_at: null,
+    episodes: ["ep-2026-0331-1400"]
+  },
+  {
+    id: "e9",
+    source: "Claude_Code", target: "Subagent",
+    relation: "HAS_COMPONENT",
+    fact: "Claude Code 具备 Subagent 子代理组件，支持任务的并行编排与委派",
+    valid_at: "2026-03-31T13:25:00Z", invalid_at: null,
+    episodes: ["ep-2026-0331-1400"]
+  }
+];
+
+// ───────── Stats ─────────
+document.getElementById("node-count").textContent = nodes.length;
+document.getElementById("edge-count").textContent = edges.length;
+const allEpisodes = new Set();
+edges.forEach(e => e.episodes.forEach(ep => allEpisodes.add(ep)));
+document.getElementById("episode-count").textContent = allEpisodes.size;
+
+// ───────── Color & Size ─────────
+const colorMap = { person: "#64e4ff", tech: "#3a7bff", document: "#6e5cff" };
+const typeLabel = { person: "人物", tech: "技术 / 工具", document: "文档" };
+
+function nodeRadius(d) {
+  const linkCount = edges.filter(e => e.source === d.id || e.target === d.id
+    || (e.source.id || e.source) === d.id || (e.target.id || e.target) === d.id).length;
+  return Math.max(20, 14 + linkCount * 4);
+}
+
+// ───────── SVG Setup ─────────
+const svg = d3.select("#graph-svg");
+const container = svg.append("g");
+
+const zoom = d3.zoom()
+  .scaleExtent([0.3, 4])
+  .on("zoom", (e) => container.attr("transform", e.transform));
+svg.call(zoom);
+
+const width = window.innerWidth - 400;
+const height = window.innerHeight;
+
+// ───────── Simulation ─────────
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(edges).id(d => d.id).distance(160))
+  .force("charge", d3.forceManyBody().strength(-600))
+  .force("center", d3.forceCenter(width / 2, height / 2))
+  .force("collision", d3.forceCollide().radius(d => nodeRadius(d) + 20));
+
+// ───────── Edge curving for parallel edges ─────────
+function computeCurvatures() {
+  const pairCount = {};
+  const pairIdx = {};
+  edges.forEach(e => {
+    const key = [e.source.id || e.source, e.target.id || e.target].sort().join("||");
+    pairCount[key] = (pairCount[key] || 0) + 1;
+    pairIdx[key] = 0;
+  });
+  edges.forEach(e => {
+    const key = [e.source.id || e.source, e.target.id || e.target].sort().join("||");
+    const total = pairCount[key];
+    const idx = pairIdx[key]++;
+    if (total === 1) { e._curve = 0; }
+    else { e._curve = (idx - (total - 1) / 2) * 50; }
+  });
+}
+computeCurvatures();
+
+// ───────── Draw edges ─────────
+const linkGroup = container.append("g");
+
+const linkPaths = linkGroup.selectAll("path")
+  .data(edges)
+  .join("path")
+  .attr("fill", "none")
+  .attr("stroke", d => d.invalid_at ? "#0c1628" : "#142240")
+  .attr("stroke-width", d => d.invalid_at ? 1 : 1.5)
+  .attr("stroke-dasharray", d => d.invalid_at ? "6 4" : "none")
+  .attr("marker-end", "url(#arrow)")
+  .attr("cursor", "pointer")
+  .on("click", (event, d) => { event.stopPropagation(); showEdgeDetail(d); })
+  .on("mouseenter", (event, d) => highlightEdge(d, true))
+  .on("mouseleave", (event, d) => highlightEdge(d, false));
+
+const linkLabels = linkGroup.selectAll("text")
+  .data(edges)
+  .join("text")
+  .text(d => d.relation)
+  .attr("font-size", 9)
+  .attr("font-family", "'Share Tech Mono', monospace")
+  .attr("font-weight", 400)
+  .attr("fill", d => d.invalid_at ? "#0e1830" : "#2a4068")
+  .attr("text-anchor", "middle")
+  .attr("dy", -8)
+  .attr("cursor", "pointer")
+  .attr("font-style", d => d.invalid_at ? "italic" : "normal")
+  .attr("letter-spacing", "1px")
+  .on("click", (event, d) => { event.stopPropagation(); showEdgeDetail(d); });
+
+// ───────── Draw nodes ─────────
+const nodeGroup = container.append("g");
+
+const nodeEls = nodeGroup.selectAll("g")
+  .data(nodes)
+  .join("g")
+  .attr("cursor", "grab")
+  .call(d3.drag()
+    .on("start", dragStarted)
+    .on("drag", dragged)
+    .on("end", dragEnded));
+
+// Outer dashed ring
+nodeEls.append("circle")
+  .attr("r", d => nodeRadius(d) + 8)
+  .attr("fill", "none")
+  .attr("stroke", d => colorMap[d.type])
+  .attr("stroke-width", 0.5)
+  .attr("stroke-opacity", 0.12)
+  .attr("stroke-dasharray", "4 3");
+
+// Main circle
+nodeEls.append("circle")
+  .attr("class", "node-main")
+  .attr("r", d => nodeRadius(d))
+  .attr("fill", d => colorMap[d.type])
+  .attr("fill-opacity", 0.06)
+  .attr("stroke", d => colorMap[d.type])
+  .attr("stroke-width", 1.5)
+  .attr("stroke-opacity", 0.7)
+  .attr("filter", "url(#glow)");
+
+// Inner neon core
+nodeEls.append("circle")
+  .attr("r", d => nodeRadius(d) * 0.22)
+  .attr("fill", d => colorMap[d.type])
+  .attr("fill-opacity", 0.6)
+  .attr("filter", "url(#glow)");
+
+// Label
+nodeEls.append("text")
+  .text(d => d.label)
+  .attr("text-anchor", "middle")
+  .attr("dy", d => nodeRadius(d) + 20)
+  .attr("fill", "#4a6890")
+  .attr("font-size", 10.5)
+  .attr("font-weight", 500)
+  .attr("font-family", "'Exo 2', 'Noto Sans SC', sans-serif")
+  .attr("letter-spacing", "0.8px")
+  .attr("text-transform", "uppercase");
+
+nodeEls
+  .on("click", (event, d) => { event.stopPropagation(); showNodeDetail(d); })
+  .on("mouseenter", (event, d) => highlightNode(d, true))
+  .on("mouseleave", (event, d) => highlightNode(d, false));
+
+// ───────── Tick ─────────
+simulation.on("tick", () => {
+  linkPaths.attr("d", d => {
+    const dx = d.target.x - d.source.x;
+    const dy = d.target.y - d.source.y;
+    if (d._curve === 0) {
+      return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
+    }
+    const mx = (d.source.x + d.target.x) / 2;
+    const my = (d.source.y + d.target.y) / 2;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ox = -dy / len * d._curve;
+    const oy = dx / len * d._curve;
+    return `M${d.source.x},${d.source.y} Q${mx + ox},${my + oy} ${d.target.x},${d.target.y}`;
+  });
+
+  linkLabels
+    .attr("x", d => {
+      const mx = (d.source.x + d.target.x) / 2;
+      if (d._curve === 0) return mx;
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return mx + (-dy / len * d._curve) * 0.5;
+    })
+    .attr("y", d => {
+      const my = (d.source.y + d.target.y) / 2;
+      if (d._curve === 0) return my;
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return my + (dx / len * d._curve) * 0.5;
+    });
+
+  nodeEls.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+// ───────── Drag ─────────
+function dragStarted(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+function dragEnded(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null; d.fy = null;
+}
+
+// ───────── Highlight ─────────
+function highlightNode(d, on) {
+  const connectedEdgeIds = new Set();
+  const connectedNodeIds = new Set([d.id]);
+  edges.forEach(e => {
+    const sid = e.source.id || e.source;
+    const tid = e.target.id || e.target;
+    if (sid === d.id || tid === d.id) {
+      connectedEdgeIds.add(e.id);
+      connectedNodeIds.add(sid);
+      connectedNodeIds.add(tid);
+    }
+  });
+
+  if (on) {
+    nodeEls.select(".node-main")
+      .transition().duration(200)
+      .attr("fill-opacity", n => connectedNodeIds.has(n.id) ? 0.15 : 0.015)
+      .attr("stroke-opacity", n => connectedNodeIds.has(n.id) ? 1 : 0.06)
+      .attr("filter", n => connectedNodeIds.has(n.id) ? "url(#glow-strong)" : "none");
+    nodeEls.select("text")
+      .transition().duration(200)
+      .attr("fill-opacity", n => connectedNodeIds.has(n.id) ? 1 : 0.1)
+      .attr("fill", n => n.id === d.id ? "#fff" : (connectedNodeIds.has(n.id) ? "#6890b8" : "#4a6890"));
+    linkPaths
+      .transition().duration(200)
+      .attr("stroke", e => connectedEdgeIds.has(e.id) ? "#00c8ff" : "#060e1a")
+      .attr("stroke-opacity", e => connectedEdgeIds.has(e.id) ? 0.9 : 0.06)
+      .attr("stroke-width", e => connectedEdgeIds.has(e.id) ? 2.5 : 1)
+      .attr("marker-end", e => connectedEdgeIds.has(e.id) ? "url(#arrow-highlight)" : "url(#arrow)");
+    linkLabels
+      .transition().duration(200)
+      .attr("fill-opacity", e => connectedEdgeIds.has(e.id) ? 1 : 0.03);
+  } else {
+    nodeEls.select(".node-main")
+      .transition().duration(300)
+      .attr("fill-opacity", 0.06).attr("stroke-opacity", 0.7)
+      .attr("filter", "url(#glow)");
+    nodeEls.select("text")
+      .transition().duration(300)
+      .attr("fill-opacity", 1).attr("fill", "#4a6890");
+    linkPaths
+      .transition().duration(300)
+      .attr("stroke", e => e.invalid_at ? "#0c1628" : "#142240")
+      .attr("stroke-opacity", 1)
+      .attr("stroke-width", e => e.invalid_at ? 1 : 1.5)
+      .attr("marker-end", "url(#arrow)");
+    linkLabels.transition().duration(300).attr("fill-opacity", 1);
+  }
+}
+
+function highlightEdge(e, on) {
+  if (on) {
+    linkPaths
+      .transition().duration(150)
+      .attr("stroke", le => le.id === e.id ? "#00c8ff" : "#060e1a")
+      .attr("stroke-opacity", le => le.id === e.id ? 1 : 0.1)
+      .attr("stroke-width", le => le.id === e.id ? 3 : 1);
+    linkLabels
+      .transition().duration(150)
+      .attr("fill-opacity", le => le.id === e.id ? 1 : 0.06)
+      .attr("fill", le => le.id === e.id ? "#64e4ff" : "#2a4068");
+  } else {
+    linkPaths
+      .transition().duration(250)
+      .attr("stroke", le => le.invalid_at ? "#0c1628" : "#142240")
+      .attr("stroke-opacity", 1)
+      .attr("stroke-width", le => le.invalid_at ? 1 : 1.5);
+    linkLabels
+      .transition().duration(250)
+      .attr("fill-opacity", 1)
+      .attr("fill", le => le.invalid_at ? "#0e1830" : "#2a4068");
+  }
+}
+
+// ───────── Detail Panel ─────────
+const panel = d3.select("#detail-panel");
+const panelContent = d3.select("#panel-content");
+
+d3.select("#close-panel").on("click", () => panel.classed("hidden", true));
+svg.on("click", () => panel.classed("hidden", true));
+
+function showNodeDetail(d) {
+  const c = colorMap[d.type];
+  const relatedEdges = edges.filter(e =>
+    (e.source.id || e.source) === d.id || (e.target.id || e.target) === d.id);
+
+  let html = `<h2>${d.label}</h2>`;
+  html += `<span class="type-badge" style="background:${c}18;color:${c};border:1px solid ${c}35">${typeLabel[d.type]}</span>`;
+
+  html += `<div class="section-title">摘要 Summary</div>`;
+  html += `<div class="fact-text" style="border-left-color:${c}">${d.summary}</div>`;
+
+  if (d.details) {
+    html += `<div class="section-title">属性 Properties</div>`;
+    Object.entries(d.details).forEach(([k, v]) => {
+      html += `<div class="meta-row"><span class="label">${k}</span><span class="value">${v}</span></div>`;
+    });
+  }
+
+  html += `<div class="section-title">关联事实边 (${relatedEdges.length})</div>`;
+  relatedEdges.forEach(e => {
+    const sid = e.source.id || e.source;
+    const tid = e.target.id || e.target;
+    const direction = sid === d.id ? `→ ${tid}` : `← ${sid}`;
+    const expired = e.invalid_at ? ' style="opacity:0.5;text-decoration:line-through"' : '';
+    html += `<div class="edge-list-item" data-edge-id="${e.id}">
+      <span class="rel">${e.relation}</span><span class="target">${direction}</span>
+      <div${expired} style="margin-top:6px;color:#3a5078;font-size:12px;line-height:1.6">${e.fact}</div>
+    </div>`;
+  });
+
+  panelContent.html(html);
+  panel.classed("hidden", false);
+
+  panelContent.selectAll(".edge-list-item").on("click", function () {
+    const eid = this.getAttribute("data-edge-id");
+    const edge = edges.find(e => e.id === eid);
+    if (edge) showEdgeDetail(edge);
+  });
+}
+
+function showEdgeDetail(e) {
+  const sid = e.source.id || e.source;
+  const tid = e.target.id || e.target;
+  const isExpired = !!e.invalid_at;
+
+  let html = `<h2 style="font-size:16px;color:#64e4ff">${sid} → ${tid}</h2>`;
+  html += `<span class="type-badge" style="background:#00c8ff18;color:#64e4ff;border:1px solid #00c8ff35">${e.relation}</span>`;
+
+  if (isExpired) {
+    html += `<span class="type-badge" style="background:#ff4a4a12;color:#ff6b6b;border:1px solid #ff4a4a30;margin-left:6px">已失效</span>`;
+  }
+
+  html += `<div class="section-title">事实 Fact</div>`;
+  html += `<div class="fact-text">${e.fact}</div>`;
+
+  html += `<div class="section-title">时间信息 Temporal</div>`;
+  html += `<div class="meta-row"><span class="label">valid_at</span><span class="value">${formatTime(e.valid_at)}</span></div>`;
+  html += `<div class="meta-row"><span class="label">invalid_at</span><span class="value">${e.invalid_at ? formatTime(e.invalid_at) : '<span style="color:#00c8ff;text-shadow:0 0 6px rgba(0,200,255,0.3)">null (仍有效)</span>'}</span></div>`;
+
+  html += `<div class="section-title">来源 Episodes</div>`;
+  e.episodes.forEach(ep => {
+    html += `<div class="meta-row"><span class="label">episode</span><span class="value" style="font-family:'Share Tech Mono',monospace;font-size:11px">${ep}</span></div>`;
+  });
+
+  html += `<div class="section-title">关联节点</div>`;
+  html += `<div class="edge-list-item" data-node-id="${sid}"><span class="rel">Source</span><span class="target">${sid}</span></div>`;
+  html += `<div class="edge-list-item" data-node-id="${tid}"><span class="rel">Target</span><span class="target">${tid}</span></div>`;
+
+  panelContent.html(html);
+  panel.classed("hidden", false);
+
+  panelContent.selectAll(".edge-list-item[data-node-id]").on("click", function () {
+    const nid = this.getAttribute("data-node-id");
+    const node = nodes.find(n => n.id === nid);
+    if (node) showNodeDetail(node);
+  });
+}
+
+function formatTime(t) {
+  if (!t) return "—";
+  return t.replace("T", " ").replace("Z", " UTC");
+}
+
+// ───────── Resize ─────────
+window.addEventListener("resize", () => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  simulation.force("center", d3.forceCenter(w / 2, h / 2));
+  simulation.alpha(0.3).restart();
+});
+</script>
+</body>
+</html>

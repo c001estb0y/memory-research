@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graphiti 知识图谱 — codebuddy-mem 记忆数据</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0f1117;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+
+  #graph-container {
+    flex: 1;
+    position: relative;
+  }
+
+  svg { width: 100%; height: 100%; }
+
+  /* ---------- Detail Panel ---------- */
+  #detail-panel {
+    width: 380px;
+    min-width: 380px;
+    background: #161822;
+    border-left: 1px solid #2a2d3a;
+    padding: 28px 24px;
+    overflow-y: auto;
+    transition: transform 0.25s ease;
+  }
+  #detail-panel.hidden {
+    transform: translateX(100%);
+    width: 0; min-width: 0; padding: 0;
+    border: none;
+    overflow: hidden;
+  }
+
+  #detail-panel h2 {
+    font-size: 18px;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+  #detail-panel .type-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  #detail-panel .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #888;
+    margin: 20px 0 8px;
+  }
+  #detail-panel .fact-text {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #ccc;
+    background: #1e2030;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border-left: 3px solid #6c8cff;
+    margin-bottom: 8px;
+  }
+  #detail-panel .meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #22253a;
+    font-size: 13px;
+  }
+  #detail-panel .meta-row .label { color: #888; }
+  #detail-panel .meta-row .value { color: #bbb; text-align: right; max-width: 220px; }
+
+  #detail-panel .edge-list-item {
+    background: #1e2030;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #detail-panel .edge-list-item:hover { background: #282b40; }
+  #detail-panel .edge-list-item .rel { color: #6c8cff; font-weight: 600; font-size: 12px; }
+  #detail-panel .edge-list-item .target { color: #aaa; margin-left: 4px; }
+
+  #close-panel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  #close-panel:hover { color: #fff; }
+
+  /* ---------- Legend ---------- */
+  #legend {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(22, 24, 34, 0.92);
+    border: 1px solid #2a2d3a;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    pointer-events: none;
+  }
+  #legend .item { display: flex; align-items: center; margin-bottom: 6px; }
+  #legend .item:last-child { margin-bottom: 0; }
+  #legend .dot {
+    width: 12px; height: 12px; border-radius: 50%; margin-right: 10px; flex-shrink: 0;
+  }
+
+  /* ---------- Title ---------- */
+  #title-bar {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    font-size: 13px;
+    color: #555;
+    pointer-events: none;
+  }
+  #title-bar span { color: #777; }
+
+  /* ---------- Tooltip ---------- */
+  #tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(22, 24, 34, 0.95);
+    border: 1px solid #3a3d4a;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #ddd;
+    max-width: 320px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<div id="graph-container">
+  <svg id="graph-svg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 6" refX="28" refY="3"
+              markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,3 L0,6 Z" fill="#555"/>
+      </marker>
+      <marker id="arrow-highlight" viewBox="0 0 10 6" refX="28" refY="3"
+              markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,3 L0,6 Z" fill="#6c8cff"/>
+      </marker>
+    </defs>
+  </svg>
+
+  <div id="legend">
+    <div class="item"><div class="dot" style="background:#4a9eff"></div>人物 (Person)</div>
+    <div class="item"><div class="dot" style="background:#50c878"></div>技术 / 工具 (Tech)</div>
+    <div class="item"><div class="dot" style="background:#f5a623"></div>文档 (Document)</div>
+  </div>
+
+  <div id="title-bar">
+    Graphiti Knowledge Graph <span>— codebuddy-mem session data (Chapter 6)</span>
+  </div>
+
+  <div id="tooltip"></div>
+</div>
+
+<div id="detail-panel" class="hidden">
+  <button id="close-panel">&times;</button>
+  <div id="panel-content"></div>
+</div>
+
+<script>
+// ───────── Data ─────────
+const nodes = [
+  {
+    id: "minusjiang",
+    label: "minusjiang",
+    type: "person",
+    summary: "研究者，正在调研 AI Agent 长期记忆方案，包括 Mem0 和 Graphiti 的技术评估与对比。",
+    details: { "entity_type": "Person / User", "group_id": "memory-research" }
+  },
+  {
+    id: "Mem0",
+    label: "Mem0",
+    type: "tech",
+    summary: "通用 AI Agent 长期记忆开源方案，支持向量+图双轨存储。图记忆与关系抽取高度依赖 LLM 多阶段调用。社区评价显示存在记忆质量、成本和工程可用性方面的局限。",
+    details: { "entity_type": "Technology / Framework", "stars": "47.8K", "storage": "向量库 + 可选图（独立运行）" }
+  },
+  {
+    id: "LLM",
+    label: "LLM",
+    type: "tech",
+    summary: "大语言模型，Graphiti 和 Mem0 的核心依赖，用于实体抽取、事实抽取、去重判定、矛盾检测、实体摘要更新等多个环节。",
+    details: { "entity_type": "Technology", "调用次数/条": "Graphiti 3-5次, Mem0 4-5次" }
+  },
+  {
+    id: "Mem0_tech_doc",
+    label: "Mem0 技术方案文档",
+    type: "document",
+    summary: "minusjiang 撰写并多轮补充的 Mem0 技术方案分析文档，涵盖三段式写入管线、向量+图双轨存储架构等内容。",
+    details: { "entity_type": "Document", "format": "Markdown" }
+  },
+  {
+    id: "Mem0_community_doc",
+    label: "Mem0 社区评价文档",
+    type: "document",
+    summary: "minusjiang 编辑的关于 Mem0 社区评价与局限性的 Markdown 文档，重点在记忆效果、工程可用性、成本与稳定性等方面。",
+    details: { "entity_type": "Document", "format": "Markdown" }
+  },
+  {
+    id: "Graphiti",
+    label: "Graphiti",
+    type: "tech",
+    summary: "Zep 开源的知识图谱记忆引擎，使用统一图存储（Neo4j/FalkorDB），支持时序推理、三路混合检索和完整溯源。约 9K Stars。",
+    details: { "entity_type": "Technology / Framework", "stars": "~9K", "storage": "统一图（Neo4j/FalkorDB）" }
+  },
+  {
+    id: "Claude_Code",
+    label: "Claude Code",
+    type: "tech",
+    summary: "Anthropic 的 AI 编程助手，具备子代理（Subagent）编排机制和多种搜索工具（如 Grep）。",
+    details: { "entity_type": "Technology / Tool", "vendor": "Anthropic" }
+  },
+  {
+    id: "Grep",
+    label: "Grep",
+    type: "tech",
+    summary: "Claude Code 内置的搜索工具之一，用于在代码库中进行文本匹配搜索。",
+    details: { "entity_type": "Tool / Component" }
+  },
+  {
+    id: "Subagent",
+    label: "Subagent",
+    type: "tech",
+    summary: "Claude Code 的子代理组件，负责执行被委派的独立子任务，支持并行编排。",
+    details: { "entity_type": "Component" }
+  }
+];
+
+const edges = [
+  {
+    id: "e1",
+    source: "minusjiang", target: "Mem0",
+    relation: "EVALUATES",
+    fact: "minusjiang 正在搜索并整理社区对 Mem0 的评价及其局限性",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e2",
+    source: "Mem0", target: "LLM",
+    relation: "DEPENDS_ON",
+    fact: "Mem0 的图记忆与关系抽取高度依赖 LLM 多阶段调用",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e3",
+    source: "minusjiang", target: "Mem0_community_doc",
+    relation: "AUTHORED",
+    fact: "minusjiang 编辑了关于 Mem0 社区评价与局限性的 Markdown 文档",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e4",
+    source: "minusjiang", target: "Mem0_tech_doc",
+    relation: "UPDATED",
+    fact: "minusjiang 完成了 Mem0 技术方案相关文档的多轮补充",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e5",
+    source: "Mem0", target: "Graphiti",
+    relation: "COMPARED_WITH",
+    fact: "Mem0 与 Graphiti 被进行系统性技术对比，涵盖存储架构、时序能力、检索方式、溯源机制等多个维度",
+    valid_at: "2026-04-02T14:02:17Z", invalid_at: null,
+    episodes: ["ep-2026-0402-1421"]
+  },
+  {
+    id: "e6",
+    source: "minusjiang", target: "Mem0",
+    relation: "RESEARCHES",
+    fact: "minusjiang 正在研究 Mem0 的三段式写入管线",
+    valid_at: "2026-04-02T13:47:53Z", invalid_at: "2026-04-02T14:02:17Z",
+    episodes: ["ep-2026-0402-1420"]
+  },
+  {
+    id: "e7",
+    source: "minusjiang", target: "Claude_Code",
+    relation: "RESEARCHES",
+    fact: "minusjiang 正在研究 Claude Code 的子代理编排机制",
+    valid_at: "2026-03-31T13:25:00Z", invalid_at: "2026-04-02T13:47:53Z",
+    episodes: ["ep-2026-0331-1400"]
+  },
+  {
+    id: "e8",
+    source: "Claude_Code", target: "Grep",
+    relation: "HAS_TOOL",
+    fact: "Claude Code 具备 Grep 搜索工具，用于代码库中的文本匹配",
+    valid_at: "2026-03-31T13:25:00Z", invalid_at: null,
+    episodes: ["ep-2026-0331-1400"]
+  },
+  {
+    id: "e9",
+    source: "Claude_Code", target: "Subagent",
+    relation: "HAS_COMPONENT",
+    fact: "Claude Code 具备 Subagent 子代理组件，支持任务的并行编排与委派",
+    valid_at: "2026-03-31T13:25:00Z", invalid_at: null,
+    episodes: ["ep-2026-0331-1400"]
+  }
+];
+
+// ───────── Color & Size ─────────
+const colorMap = { person: "#4a9eff", tech: "#50c878", document: "#f5a623" };
+const typeLabel = { person: "人物", tech: "技术 / 工具", document: "文档" };
+
+function nodeRadius(d) {
+  const linkCount = edges.filter(e => e.source === d.id || e.target === d.id
+    || (e.source.id || e.source) === d.id || (e.target.id || e.target) === d.id).length;
+  return Math.max(18, 12 + linkCount * 4);
+}
+
+// ───────── SVG Setup ─────────
+const svg = d3.select("#graph-svg");
+const container = svg.append("g");
+
+const zoom = d3.zoom()
+  .scaleExtent([0.3, 4])
+  .on("zoom", (e) => container.attr("transform", e.transform));
+svg.call(zoom);
+
+const width = window.innerWidth - 380;
+const height = window.innerHeight;
+
+// ───────── Simulation ─────────
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(edges).id(d => d.id).distance(160))
+  .force("charge", d3.forceManyBody().strength(-600))
+  .force("center", d3.forceCenter(width / 2, height / 2))
+  .force("collision", d3.forceCollide().radius(d => nodeRadius(d) + 20));
+
+// ───────── Edge curving for parallel edges ─────────
+function computeCurvatures() {
+  const pairCount = {};
+  const pairIdx = {};
+  edges.forEach(e => {
+    const key = [e.source.id || e.source, e.target.id || e.target].sort().join("||");
+    pairCount[key] = (pairCount[key] || 0) + 1;
+    pairIdx[key] = 0;
+  });
+  edges.forEach(e => {
+    const key = [e.source.id || e.source, e.target.id || e.target].sort().join("||");
+    const total = pairCount[key];
+    const idx = pairIdx[key]++;
+    if (total === 1) { e._curve = 0; }
+    else { e._curve = (idx - (total - 1) / 2) * 50; }
+  });
+}
+computeCurvatures();
+
+// ───────── Draw edges ─────────
+const linkGroup = container.append("g");
+
+const linkPaths = linkGroup.selectAll("path")
+  .data(edges)
+  .join("path")
+  .attr("fill", "none")
+  .attr("stroke", d => d.invalid_at ? "#3a3a4a" : "#555")
+  .attr("stroke-width", d => d.invalid_at ? 1 : 1.8)
+  .attr("stroke-dasharray", d => d.invalid_at ? "6 4" : "none")
+  .attr("marker-end", "url(#arrow)")
+  .attr("cursor", "pointer")
+  .on("click", (event, d) => { event.stopPropagation(); showEdgeDetail(d); })
+  .on("mouseenter", (event, d) => highlightEdge(d, true))
+  .on("mouseleave", (event, d) => highlightEdge(d, false));
+
+const linkLabels = linkGroup.selectAll("text")
+  .data(edges)
+  .join("text")
+  .text(d => d.relation)
+  .attr("font-size", 10)
+  .attr("fill", d => d.invalid_at ? "#555" : "#888")
+  .attr("text-anchor", "middle")
+  .attr("dy", -6)
+  .attr("cursor", "pointer")
+  .attr("font-style", d => d.invalid_at ? "italic" : "normal")
+  .on("click", (event, d) => { event.stopPropagation(); showEdgeDetail(d); });
+
+// ───────── Draw nodes ─────────
+const nodeGroup = container.append("g");
+
+const nodeEls = nodeGroup.selectAll("g")
+  .data(nodes)
+  .join("g")
+  .attr("cursor", "grab")
+  .call(d3.drag()
+    .on("start", dragStarted)
+    .on("drag", dragged)
+    .on("end", dragEnded));
+
+nodeEls.append("circle")
+  .attr("r", d => nodeRadius(d))
+  .attr("fill", d => colorMap[d.type])
+  .attr("fill-opacity", 0.15)
+  .attr("stroke", d => colorMap[d.type])
+  .attr("stroke-width", 2);
+
+nodeEls.append("text")
+  .text(d => d.label)
+  .attr("text-anchor", "middle")
+  .attr("dy", d => nodeRadius(d) + 16)
+  .attr("fill", "#bbb")
+  .attr("font-size", 12)
+  .attr("font-weight", 500);
+
+nodeEls
+  .on("click", (event, d) => { event.stopPropagation(); showNodeDetail(d); })
+  .on("mouseenter", (event, d) => highlightNode(d, true))
+  .on("mouseleave", (event, d) => highlightNode(d, false));
+
+// ───────── Tick ─────────
+simulation.on("tick", () => {
+  linkPaths.attr("d", d => {
+    const dx = d.target.x - d.source.x;
+    const dy = d.target.y - d.source.y;
+    if (d._curve === 0) {
+      return `M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
+    }
+    const mx = (d.source.x + d.target.x) / 2;
+    const my = (d.source.y + d.target.y) / 2;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ox = -dy / len * d._curve;
+    const oy = dx / len * d._curve;
+    return `M${d.source.x},${d.source.y} Q${mx + ox},${my + oy} ${d.target.x},${d.target.y}`;
+  });
+
+  linkLabels
+    .attr("x", d => {
+      const mx = (d.source.x + d.target.x) / 2;
+      if (d._curve === 0) return mx;
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return mx + (-dy / len * d._curve) * 0.5;
+    })
+    .attr("y", d => {
+      const my = (d.source.y + d.target.y) / 2;
+      if (d._curve === 0) return my;
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return my + (dx / len * d._curve) * 0.5;
+    });
+
+  nodeEls.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+// ───────── Drag ─────────
+function dragStarted(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+function dragEnded(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null; d.fy = null;
+}
+
+// ───────── Highlight ─────────
+function highlightNode(d, on) {
+  const connectedEdgeIds = new Set();
+  const connectedNodeIds = new Set([d.id]);
+  edges.forEach(e => {
+    const sid = e.source.id || e.source;
+    const tid = e.target.id || e.target;
+    if (sid === d.id || tid === d.id) {
+      connectedEdgeIds.add(e.id);
+      connectedNodeIds.add(sid);
+      connectedNodeIds.add(tid);
+    }
+  });
+
+  if (on) {
+    nodeEls.select("circle")
+      .attr("fill-opacity", n => connectedNodeIds.has(n.id) ? 0.3 : 0.06)
+      .attr("stroke-opacity", n => connectedNodeIds.has(n.id) ? 1 : 0.2);
+    nodeEls.select("text")
+      .attr("fill-opacity", n => connectedNodeIds.has(n.id) ? 1 : 0.2);
+    linkPaths
+      .attr("stroke", e => connectedEdgeIds.has(e.id) ? "#6c8cff" : "#2a2a3a")
+      .attr("stroke-opacity", e => connectedEdgeIds.has(e.id) ? 1 : 0.15)
+      .attr("marker-end", e => connectedEdgeIds.has(e.id) ? "url(#arrow-highlight)" : "url(#arrow)");
+    linkLabels
+      .attr("fill-opacity", e => connectedEdgeIds.has(e.id) ? 1 : 0.1);
+  } else {
+    nodeEls.select("circle").attr("fill-opacity", 0.15).attr("stroke-opacity", 1);
+    nodeEls.select("text").attr("fill-opacity", 1);
+    linkPaths
+      .attr("stroke", e => e.invalid_at ? "#3a3a4a" : "#555")
+      .attr("stroke-opacity", 1)
+      .attr("marker-end", "url(#arrow)");
+    linkLabels.attr("fill-opacity", 1);
+  }
+}
+
+function highlightEdge(e, on) {
+  if (on) {
+    linkPaths.attr("stroke", le => le.id === e.id ? "#6c8cff" : "#2a2a3a")
+      .attr("stroke-opacity", le => le.id === e.id ? 1 : 0.2)
+      .attr("stroke-width", le => le.id === e.id ? 3 : 1.5);
+    linkLabels.attr("fill-opacity", le => le.id === e.id ? 1 : 0.2);
+  } else {
+    linkPaths
+      .attr("stroke", le => le.invalid_at ? "#3a3a4a" : "#555")
+      .attr("stroke-opacity", 1)
+      .attr("stroke-width", le => le.invalid_at ? 1 : 1.8);
+    linkLabels.attr("fill-opacity", 1);
+  }
+}
+
+// ───────── Detail Panel ─────────
+const panel = d3.select("#detail-panel");
+const panelContent = d3.select("#panel-content");
+
+d3.select("#close-panel").on("click", () => panel.classed("hidden", true));
+svg.on("click", () => panel.classed("hidden", true));
+
+function showNodeDetail(d) {
+  const c = colorMap[d.type];
+  const relatedEdges = edges.filter(e =>
+    (e.source.id || e.source) === d.id || (e.target.id || e.target) === d.id);
+
+  let html = `<h2>${d.label}</h2>`;
+  html += `<span class="type-badge" style="background:${c}22;color:${c};border:1px solid ${c}55">${typeLabel[d.type]}</span>`;
+
+  html += `<div class="section-title">摘要 Summary</div>`;
+  html += `<div class="fact-text" style="border-left-color:${c}">${d.summary}</div>`;
+
+  if (d.details) {
+    html += `<div class="section-title">属性 Properties</div>`;
+    Object.entries(d.details).forEach(([k, v]) => {
+      html += `<div class="meta-row"><span class="label">${k}</span><span class="value">${v}</span></div>`;
+    });
+  }
+
+  html += `<div class="section-title">关联事实边 (${relatedEdges.length})</div>`;
+  relatedEdges.forEach(e => {
+    const sid = e.source.id || e.source;
+    const tid = e.target.id || e.target;
+    const direction = sid === d.id ? `→ ${tid}` : `← ${sid}`;
+    const expired = e.invalid_at ? ' style="opacity:0.5;text-decoration:line-through"' : '';
+    html += `<div class="edge-list-item" data-edge-id="${e.id}">
+      <span class="rel">${e.relation}</span><span class="target">${direction}</span>
+      <div${expired} style="margin-top:4px;color:#999;font-size:12px">${e.fact}</div>
+    </div>`;
+  });
+
+  panelContent.html(html);
+  panel.classed("hidden", false);
+
+  panelContent.selectAll(".edge-list-item").on("click", function () {
+    const eid = this.getAttribute("data-edge-id");
+    const edge = edges.find(e => e.id === eid);
+    if (edge) showEdgeDetail(edge);
+  });
+}
+
+function showEdgeDetail(e) {
+  const sid = e.source.id || e.source;
+  const tid = e.target.id || e.target;
+  const isExpired = !!e.invalid_at;
+
+  let html = `<h2 style="font-size:15px;color:#6c8cff">${sid} → ${tid}</h2>`;
+  html += `<span class="type-badge" style="background:#6c8cff22;color:#6c8cff;border:1px solid #6c8cff55">${e.relation}</span>`;
+
+  if (isExpired) {
+    html += `<span class="type-badge" style="background:#ff4d4d22;color:#ff6b6b;border:1px solid #ff4d4d55;margin-left:6px">已失效</span>`;
+  }
+
+  html += `<div class="section-title">事实 Fact</div>`;
+  html += `<div class="fact-text">${e.fact}</div>`;
+
+  html += `<div class="section-title">时间信息 Temporal</div>`;
+  html += `<div class="meta-row"><span class="label">valid_at</span><span class="value">${formatTime(e.valid_at)}</span></div>`;
+  html += `<div class="meta-row"><span class="label">invalid_at</span><span class="value">${e.invalid_at ? formatTime(e.invalid_at) : '<span style="color:#50c878">null (仍有效)</span>'}</span></div>`;
+
+  html += `<div class="section-title">来源 Episodes</div>`;
+  e.episodes.forEach(ep => {
+    html += `<div class="meta-row"><span class="label">episode</span><span class="value" style="font-family:monospace;font-size:12px">${ep}</span></div>`;
+  });
+
+  html += `<div class="section-title">关联节点</div>`;
+  html += `<div class="edge-list-item" data-node-id="${sid}"><span class="rel">Source</span><span class="target">${sid}</span></div>`;
+  html += `<div class="edge-list-item" data-node-id="${tid}"><span class="rel">Target</span><span class="target">${tid}</span></div>`;
+
+  panelContent.html(html);
+  panel.classed("hidden", false);
+
+  panelContent.selectAll(".edge-list-item[data-node-id]").on("click", function () {
+    const nid = this.getAttribute("data-node-id");
+    const node = nodes.find(n => n.id === nid);
+    if (node) showNodeDetail(node);
+  });
+}
+
+function formatTime(t) {
+  if (!t) return "—";
+  return t.replace("T", " ").replace("Z", " UTC");
+}
+
+// ───────── Resize ─────────
+window.addEventListener("resize", () => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  simulation.force("center", d3.forceCenter(w / 2, h / 2));
+  simulation.alpha(0.3).restart();
+});
+</script>
+</body>
+</html>
