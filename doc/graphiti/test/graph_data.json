@@ -1,0 +1,2121 @@
+{
+  "nodes": [
+    {
+      "id": "ziyadyao",
+      "label": "ziyadyao",
+      "type": "person",
+      "summary": "负责资产迁移工作的开发者，使用Unreal Python进行脚本开发和SVN提交管理",
+      "details": {
+        "出现次数": "4 个 episode"
+      }
+    },
+    {
+      "id": "svn资产引用修复脚本_v3",
+      "label": "SVN资产引用修复脚本 v3",
+      "type": "tech",
+      "summary": "用于修复SVN资产断裂引用的脚本，v3版本新增MaterialFunction类型处理逻辑",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "materialfunction",
+      "label": "MaterialFunction",
+      "type": "concept",
+      "summary": "UE中的材质函数资产类型，在v3脚本中新增了专门的处理逻辑",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dry_run报告",
+      "label": "dry run报告",
+      "type": "document",
+      "summary": "包含607个uasset断裂引用分布分析结果的运行报告",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "uasset断裂引用",
+      "label": "uasset断裂引用",
+      "type": "issue",
+      "summary": "dry run报告中发现的607个uasset存在断裂引用的问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "continue_ai",
+      "label": "Continue AI",
+      "type": "tech",
+      "summary": "被配置并对接第三方代理API的AI代码助手工具",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "timi_ai平台",
+      "label": "TIMI AI平台",
+      "type": "tech",
+      "summary": "作为Continue AI第三方代理API对接的AI平台之一",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "venus平台",
+      "label": "Venus平台",
+      "type": "tech",
+      "summary": "作为Continue AI第三方代理API对接的AI平台之一",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "ugc玩法本地cook无法进入问题",
+      "label": "UGC玩法本地Cook无法进入问题",
+      "type": "issue",
+      "summary": "UGC玩法在本地Cook后无法进入游戏的问题，已被排查",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "clienttools",
+      "label": "ClientTools",
+      "type": "tech",
+      "summary": "包含OnAnalyzeFolderDependencies功能的客户端工具，开发历史被回溯",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "onanalyzefolderdependencies",
+      "label": "OnAnalyzeFolderDependencies",
+      "type": "tech",
+      "summary": "ClientTools中用于分析文件夹依赖关系的功能模块",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar/ugc离散化方案",
+      "label": "DPAR/UGC离散化方案",
+      "type": "concept",
+      "summary": "涉及UGC内容离散化的关键架构方案，开发决策历史被回溯",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "hughes",
+      "label": "hughes",
+      "type": "person",
+      "summary": "完成DPAR流水线从QuickGenAPP到cookpak模式转换的开发者",
+      "details": {
+        "出现次数": "3 个 episode"
+      }
+    },
+    {
+      "id": "dpar流水线",
+      "label": "DPAR流水线",
+      "type": "tech",
+      "summary": "用于构建和打包的自动化流水线系统，支持QuickGenAPP和cookpak等模式",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "quickgenapp模式",
+      "label": "QuickGenAPP模式",
+      "type": "concept",
+      "summary": "DPAR流水线的一种构建模式，被迁移替换为cookpak模式",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "cookpak模式",
+      "label": "cookpak模式",
+      "type": "concept",
+      "summary": "DPAR流水线的目标构建模式，通过Cook和Pak流程生成APK",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar_build_wrapper.py",
+      "label": "dpar_build_wrapper.py",
+      "type": "tech",
+      "summary": "用于包装DPAR构建过程的Python脚本，具备容错Blueprint编译错误的能力",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "svn认证路径不匹配问题",
+      "label": "SVN认证路径不匹配问题",
+      "type": "issue",
+      "summary": "DPAR流水线中SVN认证失败及路径不匹配导致构建失败的问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "blueprint编译错误",
+      "label": "Blueprint编译错误",
+      "type": "issue",
+      "summary": "Cook过程中Blueprint编译失败的错误，需要容错处理",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "hotshaderdivide_package_is_too_old问题",
+      "label": "HotShaderDivide Package is too old问题",
+      "type": "issue",
+      "summary": "Cook过程覆写PublicAssets源文件导致HotShaderDivide报'Package is too old'的错误",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "cook覆写publicassets问题",
+      "label": "Cook覆写PublicAssets问题",
+      "type": "issue",
+      "summary": "Cook过程中覆写PublicAssets源文件，导致资源版本冲突的问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "apk启动卡顿热更新问题",
+      "label": "APK启动卡顿热更新问题",
+      "type": "issue",
+      "summary": "APK启动时因热更新配置不当导致卡顿的问题，需确保p_base_1/2/3打入APK",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "p_base_1/2/3",
+      "label": "p_base_1/2/3",
+      "type": "concept",
+      "summary": "需要打入APK的基础Pak包，缺失会导致APK启动卡顿",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "directoriestonevercook",
+      "label": "DirectoriesToNeverCook",
+      "type": "concept",
+      "summary": "UE4配置项，用于指定不参与Cook的目录，会被Build.py的ConfigSettingBlacklist拦截",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "build.py",
+      "label": "Build.py",
+      "type": "tech",
+      "summary": "构建脚本，其ConfigSettingBlacklist机制会拦截DirectoriesToNeverCook配置",
+      "details": {
+        "出现次数": "2 个 episode"
+      }
+    },
+    {
+      "id": "configsettingblacklist",
+      "label": "ConfigSettingBlacklist",
+      "type": "concept",
+      "summary": "Build.py中的黑名单机制，用于拦截特定配置项如DirectoriesToNeverCook",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "ue4硬引用与软引用",
+      "label": "UE4硬引用与软引用",
+      "type": "concept",
+      "summary": "UE4中两种资源引用方式，在Cook过程中行为存在差异，影响资源打包结果",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "主cook不注册挂载点方案",
+      "label": "主Cook不注册挂载点方案",
+      "type": "concept",
+      "summary": "解决Cook覆写PublicAssets问题的方案A：主Cook阶段不注册挂载点以避免资源冲突",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "unreal_python",
+      "label": "Unreal Python",
+      "type": "tech",
+      "summary": "用于在Unreal Engine环境中编写自动化脚本的Python接口",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "依赖校验脚本",
+      "label": "依赖校验脚本",
+      "type": "document",
+      "summary": "使用Unreal Python开发的用于验证公共资产完整性的依赖校验脚本",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "抽查脚本",
+      "label": "抽查脚本",
+      "type": "document",
+      "summary": "使用Unreal Python开发的用于抽查资产完整性的脚本",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "svn",
+      "label": "SVN",
+      "type": "tech",
+      "summary": "版本控制系统，部分CSV条目引用的资产已不存在于其中",
+      "details": {
+        "出现次数": "2 个 episode"
+      }
+    },
+    {
+      "id": "git",
+      "label": "Git",
+      "type": "tech",
+      "summary": "版本控制工具，通过调整忽略规则支持项目配置文件的版本控制",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "资产迁移",
+      "label": "资产迁移",
+      "type": "concept",
+      "summary": "将607个资产及其依赖路径进行迁移并修复的工程任务",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "svn冲突",
+      "label": "SVN冲突",
+      "type": "issue",
+      "summary": "在资产迁移过程中出现的SVN版本冲突问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "公共资产完整性",
+      "label": "公共资产完整性",
+      "type": "concept",
+      "summary": "迁移过程中需要验证的公共资产的完整性状态",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar集成项目",
+      "label": "DPAR集成项目",
+      "type": "concept",
+      "summary": "涉及SVN认证、流水线构建、资产Cook等多个环节的集成项目",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "svn_system账户认证",
+      "label": "SVN SYSTEM账户认证",
+      "type": "concept",
+      "summary": "SVN版本控制系统的SYSTEM账户认证配置",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "psexec",
+      "label": "PsExec",
+      "type": "tech",
+      "summary": "用于远程执行进程的工具，在DPAR项目中用于SVN认证配置",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "multiprocessing包装器",
+      "label": "multiprocessing包装器",
+      "type": "tech",
+      "summary": "Python多进程包装器，用于流水线并行执行，存在兼容性问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "pakchunknew阶段",
+      "label": "PakChunkNew阶段",
+      "type": "concept",
+      "summary": "流水线中负责Pak分块处理的执行阶段",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "apk资产加载失败",
+      "label": "APK资产加载失败",
+      "type": "issue",
+      "summary": "APK中资产无法正常加载的问题，根因为DefaultGame.ini配置缺失和SDK初始化问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "defaultgame.ini",
+      "label": "DefaultGame.ini",
+      "type": "document",
+      "summary": "游戏默认配置文件，其中公共资产配置缺失导致APK资产加载失败",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "nevercook_ini配置",
+      "label": "NeverCook INI配置",
+      "type": "document",
+      "summary": "控制资产不参与Cook的INI配置文件，存在section header格式问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "蓝图编译错误",
+      "label": "蓝图编译错误",
+      "type": "issue",
+      "summary": "大量蓝图编译失败的问题，与NeverCook INI配置的section header错误相关",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar_build_wrapper",
+      "label": "DPAR Build Wrapper",
+      "type": "tech",
+      "summary": "DPAR项目的构建包装器，由hughes实现，修复了硬编码路径问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar_cooked_check_dir",
+      "label": "DPAR_COOKED_CHECK_DIR",
+      "type": "concept",
+      "summary": "DPAR构建中用于指定Cook检查目录的路径变量，原为硬编码",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "fork_pipeline.yaml",
+      "label": "fork_pipeline.yaml",
+      "type": "document",
+      "summary": "流水线配置文件，存在COOK_EXIT变量处理问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "cook_exit变量",
+      "label": "COOK_EXIT变量",
+      "type": "concept",
+      "summary": "fork_pipeline.yaml中控制Cook退出逻辑的变量，存在处理缺陷",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "资产扫描与批量cook",
+      "label": "资产扫描与批量Cook",
+      "type": "concept",
+      "summary": "对游戏资产进行扫描并批量执行Cook的流程，存在命令行参数超长问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "命令行参数超长限制",
+      "label": "命令行参数超长限制",
+      "type": "issue",
+      "summary": "批量Cook过程中命令行参数超出系统长度限制的问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "白名单配置",
+      "label": "白名单配置",
+      "type": "concept",
+      "summary": "控制feature pak生成的白名单配置，配置错误导致feature pak缺失",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "feature_pak缺失",
+      "label": "feature pak缺失",
+      "type": "issue",
+      "summary": "由白名单配置错误导致的feature pak文件缺失问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "ufs路径保存恢复逻辑",
+      "label": "UFS路径保存恢复逻辑",
+      "type": "concept",
+      "summary": "在Build.py中实现的UFS路径状态保存与恢复机制，用于解决Lua脚本加载问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "lua脚本加载问题",
+      "label": "Lua脚本加载问题",
+      "type": "issue",
+      "summary": "Lua脚本无法正常加载的问题，与UFS路径状态丢失相关",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "csv文件问题",
+      "label": "CSV文件问题",
+      "type": "issue",
+      "summary": "Pak阶段涉及的CSV文件异常问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "pak阶段文件检索逻辑",
+      "label": "Pak阶段文件检索逻辑",
+      "type": "concept",
+      "summary": "Pak打包阶段中用于检索文件的逻辑，经hughes优化",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "ugc地图崩溃",
+      "label": "UGC地图崩溃",
+      "type": "issue",
+      "summary": "UGC地图运行时崩溃的问题，根因为蓝图与C++类迁移兼容性问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "蓝图与c++类迁移兼容性",
+      "label": "蓝图与C++类迁移兼容性",
+      "type": "issue",
+      "summary": "蓝图类迁移到C++类时产生的兼容性问题，导致UGC地图崩溃",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "unreal编辑器",
+      "label": "Unreal编辑器",
+      "type": "tech",
+      "summary": "用于关卡场景搭建与调整的游戏引擎编辑器",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "map.json",
+      "label": "map.json",
+      "type": "document",
+      "summary": "用于驱动地图生成的配置文件",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "unlua",
+      "label": "UnLua",
+      "type": "tech",
+      "summary": "Unreal引擎中用于Lua脚本集成的框架，用于角色挂载",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "lua",
+      "label": "Lua",
+      "type": "tech",
+      "summary": "用于坦克战游戏逻辑脚本编写的脚本语言",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "竞技场关卡场景",
+      "label": "竞技场关卡场景",
+      "type": "concept",
+      "summary": "包含墙体、地面、障碍物和敌方坦克的竞技场地图场景",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "map.json配置驱动地图生成方案",
+      "label": "map.json配置驱动地图生成方案",
+      "type": "concept",
+      "summary": "通过map.json配置文件驱动地图自动生成的设计方案",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "_mo加载异常",
+      "label": "_MO加载异常",
+      "type": "issue",
+      "summary": "Unreal项目中_MO资源加载异常的问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "坦克战lua角色挂载问题",
+      "label": "坦克战Lua角色挂载问题",
+      "type": "issue",
+      "summary": "坦克战项目中Lua/UnLua角色挂载失败或异常的问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "缩放和贴地问题",
+      "label": "缩放和贴地问题",
+      "type": "issue",
+      "summary": "地图生成过程中物体缩放比例不正确及未正确贴合地面的问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "流水线yaml构建逻辑",
+      "label": "流水线YAML构建逻辑",
+      "type": "document",
+      "summary": "现有CI/CD流水线中基于YAML的构建配置文件",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "本地python化流程",
+      "label": "本地Python化流程",
+      "type": "concept",
+      "summary": "用Python脚本替代内联硬编码方案的构建优化方向",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "流水线dpar内联脚本硬编码方案",
+      "label": "流水线DPAR内联脚本硬编码方案",
+      "type": "concept",
+      "summary": "现有流水线中存在的内联脚本硬编码构建方式，可维护性差",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "android出包流程",
+      "label": "Android出包流程",
+      "type": "concept",
+      "summary": "Android平台的构建打包流程，已完成重构与修复提交",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "windowsclient构建路径",
+      "label": "WindowsClient构建路径",
+      "type": "concept",
+      "summary": "WindowsClient平台的构建路径配置，与Android存在差异",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "python打包脚本",
+      "label": "Python打包脚本",
+      "type": "tech",
+      "summary": "收敛核心打包逻辑的Python脚本，用于提高构建流程可维护性",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar打包流程",
+      "label": "DPAR打包流程",
+      "type": "concept",
+      "summary": "将资产打包进pak文件的流程，存在资产未被正确打入的问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar配置",
+      "label": "DPAR配置",
+      "type": "document",
+      "summary": "DPAR打包流程的配置文件，当前内容异常偏空",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "pak文件",
+      "label": "pak文件",
+      "type": "tech",
+      "summary": "游戏资产打包的目标格式文件",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "ps资产",
+      "label": "PS资产",
+      "type": "concept",
+      "summary": "目标平台PS的游戏资产，当前未能成功进入pak包",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "csv残留测试条目",
+      "label": "CSV残留测试条目",
+      "type": "issue",
+      "summary": "CSV中存在已不在SVN的残留测试条目，需要清理",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "chunk打包状态异常",
+      "label": "chunk打包状态异常",
+      "type": "issue",
+      "summary": "部分目标资源的chunk/打包状态与配置和产物存在不一致问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "skill提示词机制",
+      "label": "skill提示词机制",
+      "type": "concept",
+      "summary": "与AI技能相关的提示词触发与运作机制",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "claude_code",
+      "label": "Claude Code",
+      "type": "tech",
+      "summary": "Anthropic推出的AI编程工具，ziyadyao调研了其开源许可证性质",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar项目",
+      "label": "DPAR项目",
+      "type": "tech",
+      "summary": "包含特殊PublicAssets处理流程的游戏构建项目",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "主cook",
+      "label": "主Cook",
+      "type": "concept",
+      "summary": "处理/Game/路径资源的主要Cook流程，NeverCook排除PublicAssets",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar_cook",
+      "label": "DPAR Cook",
+      "type": "concept",
+      "summary": "单独处理PublicAssets并打包为dpar_*.pak的Cook流程",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "publicassets",
+      "label": "PublicAssets",
+      "type": "concept",
+      "summary": "通过DPAR Cook单独处理并经Puffer分发的公共资源",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dpar_*.pak",
+      "label": "dpar_*.pak",
+      "type": "document",
+      "summary": "DPAR Cook生成的PublicAssets打包文件",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "puffer",
+      "label": "Puffer",
+      "type": "tech",
+      "summary": "负责分发dpar_*.pak并管理版本更新的分发系统",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "dolphin",
+      "label": "Dolphin",
+      "type": "tech",
+      "summary": "与Puffer配合的客户端版本更新系统",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "publicassets挂载时序问题",
+      "label": "PublicAssets挂载时序问题",
+      "type": "issue",
+      "summary": "3/30全量Cook时挂载点未注册导致依赖PublicAssets的BP保存失败的核心问题",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "developmentassetregistry.bin",
+      "label": "DevelopmentAssetRegistry.bin",
+      "type": "document",
+      "summary": "存储Cook缓存状态的注册表文件，删除可清除失败缓存",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "markedfailedsavekept机制",
+      "label": "MarkedFailedSaveKept机制",
+      "type": "concept",
+      "summary": "UE4增量Cook中将失败资源永久缓存跳过的机制",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "redirector",
+      "label": "Redirector",
+      "type": "concept",
+      "summary": "在Cooked构建中具有特殊行为的UE4资源重定向器",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "挂载配置前置修复",
+      "label": "挂载配置前置修复",
+      "type": "concept",
+      "summary": "将挂载点注册提前以解决PublicAssets挂载时序问题的修复方案",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    },
+    {
+      "id": "path_does_not_start_with_a_valid_root",
+      "label": "Path does not start with a valid root",
+      "type": "issue",
+      "summary": "挂载点未注册时引擎报出的错误，导致依赖PublicAssets的BP保存失败",
+      "details": {
+        "出现次数": "1 个 episode"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "ziyadyao",
+      "target": "svn资产引用修复脚本_v3",
+      "relation": "DEVELOPS",
+      "fact": "ziyadyao完成了SVN资产引用修复脚本的增强，升级至v3版本并新增了MaterialFunction类型的专门处理逻辑。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e2",
+      "source": "svn资产引用修复脚本_v3",
+      "target": "materialfunction",
+      "relation": "CONFIGURES",
+      "fact": "SVN资产引用修复脚本v3新增了针对MaterialFunction类型的专门处理逻辑。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e3",
+      "source": "ziyadyao",
+      "target": "dry_run报告",
+      "relation": "CREATES",
+      "fact": "ziyadyao分析了dry run报告中607个uasset的断裂引用分布情况。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e4",
+      "source": "dry_run报告",
+      "target": "uasset断裂引用",
+      "relation": "DISCOVERS",
+      "fact": "dry run报告揭示了607个uasset存在断裂引用的分布情况。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e5",
+      "source": "ziyadyao",
+      "target": "continue_ai",
+      "relation": "CONFIGURES",
+      "fact": "ziyadyao配置了Continue AI代码助手并对接了第三方代理API。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e6",
+      "source": "continue_ai",
+      "target": "timi_ai平台",
+      "relation": "DEPENDS_ON",
+      "fact": "Continue AI代码助手被配置为对接TIMI AI平台作为第三方代理API。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e7",
+      "source": "continue_ai",
+      "target": "venus平台",
+      "relation": "DEPENDS_ON",
+      "fact": "Continue AI代码助手被配置为对接Venus平台作为第三方代理API。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e8",
+      "source": "ziyadyao",
+      "target": "ugc玩法本地cook无法进入问题",
+      "relation": "DEBUGS",
+      "fact": "ziyadyao排查了UGC玩法在本地Cook后无法进入游戏的问题。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e9",
+      "source": "ziyadyao",
+      "target": "clienttools",
+      "relation": "DEVELOPS",
+      "fact": "ziyadyao回溯了ClientTools（含OnAnalyzeFolderDependencies）的开发历史。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e10",
+      "source": "clienttools",
+      "target": "onanalyzefolderdependencies",
+      "relation": "DEPENDS_ON",
+      "fact": "ClientTools包含OnAnalyzeFolderDependencies功能模块用于分析文件夹依赖关系。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e11",
+      "source": "ziyadyao",
+      "target": "dpar/ugc离散化方案",
+      "relation": "DEVELOPS",
+      "fact": "ziyadyao回溯了DPAR/UGC离散化方案的关键决策历史。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e12",
+      "source": "clienttools",
+      "target": "dpar/ugc离散化方案",
+      "relation": "DEPENDS_ON",
+      "fact": "ClientTools的开发历史与DPAR/UGC离散化方案的关键决策密切相关。",
+      "valid_at": "2026-03-23T12:16:59.456Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-23"
+      ]
+    },
+    {
+      "id": "e13",
+      "source": "hughes",
+      "target": "dpar流水线",
+      "relation": "MIGRATES",
+      "fact": "hughes完成了DPAR流水线从QuickGenAPP模式到cookpak模式的转换工作",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e14",
+      "source": "dpar流水线",
+      "target": "quickgenapp模式",
+      "relation": "MIGRATES",
+      "fact": "DPAR流水线从QuickGenAPP模式迁移至cookpak模式，QuickGenAPP模式被替换",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e15",
+      "source": "dpar流水线",
+      "target": "cookpak模式",
+      "relation": "USES",
+      "fact": "DPAR流水线迁移后采用cookpak模式进行构建和打包",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e16",
+      "source": "hughes",
+      "target": "svn认证路径不匹配问题",
+      "relation": "FIXES",
+      "fact": "hughes修复了DPAR流水线中SVN认证失败和路径不匹配的问题",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e17",
+      "source": "dpar_build_wrapper.py",
+      "target": "blueprint编译错误",
+      "relation": "FIXES",
+      "fact": "dpar_build_wrapper.py通过容错机制处理了Cook过程中的Blueprint编译错误",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e18",
+      "source": "hughes",
+      "target": "dpar_build_wrapper.py",
+      "relation": "DEVELOPS",
+      "fact": "hughes使用dpar_build_wrapper.py实现对Blueprint编译错误的容错处理",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e19",
+      "source": "cook覆写publicassets问题",
+      "target": "hotshaderdivide_package_is_too_old问题",
+      "relation": "CAUSES",
+      "fact": "Cook过程覆写PublicAssets源文件导致HotShaderDivide报'Package is too old'错误",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e20",
+      "source": "hughes",
+      "target": "cook覆写publicassets问题",
+      "relation": "DISCOVERS",
+      "fact": "hughes发现了Cook过程覆写PublicAssets源文件导致资源版本冲突的问题",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e21",
+      "source": "主cook不注册挂载点方案",
+      "target": "hotshaderdivide_package_is_too_old问题",
+      "relation": "FIXES",
+      "fact": "采用方案A（主Cook不注册挂载点）解决了HotShaderDivide报'Package is too old'的问题",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e22",
+      "source": "hughes",
+      "target": "apk启动卡顿热更新问题",
+      "relation": "FIXES",
+      "fact": "hughes通过确保p_base_1/2/3打入APK修复了APK启动卡顿的热更新问题",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e23",
+      "source": "p_base_1/2/3",
+      "target": "apk启动卡顿热更新问题",
+      "relation": "FIXES",
+      "fact": "将p_base_1/2/3基础Pak包打入APK后，APK启动卡顿的热更新问题得到解决",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e24",
+      "source": "configsettingblacklist",
+      "target": "directoriestonevercook",
+      "relation": "BLOCKS",
+      "fact": "Build.py中的ConfigSettingBlacklist机制会拦截DirectoriesToNeverCook配置项，使其不生效",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e25",
+      "source": "build.py",
+      "target": "configsettingblacklist",
+      "relation": "USES",
+      "fact": "Build.py使用ConfigSettingBlacklist机制对特定配置项进行拦截过滤",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e26",
+      "source": "hughes",
+      "target": "directoriestonevercook",
+      "relation": "DEBUGS",
+      "fact": "hughes深入分析了DirectoriesToNeverCook被Build.py的ConfigSettingBlacklist拦截的机制",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e27",
+      "source": "hughes",
+      "target": "ue4硬引用与软引用",
+      "relation": "DISCOVERS",
+      "fact": "hughes深入理解了UE4硬引用与软引用在Cook过程中的行为差异",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e28",
+      "source": "ue4硬引用与软引用",
+      "target": "cookpak模式",
+      "relation": "AFFECTS",
+      "fact": "UE4硬引用与软引用在Cook过程中的行为差异影响cookpak模式下的资源打包结果",
+      "valid_at": "2026-03-25T07:08:57.222Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-25"
+      ]
+    },
+    {
+      "id": "e29",
+      "source": "ziyadyao",
+      "target": "依赖校验脚本",
+      "relation": "CREATES",
+      "fact": "ziyadyao 使用 Unreal Python 开发了依赖校验脚本，用于验证公共资产的完整性。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e30",
+      "source": "ziyadyao",
+      "target": "抽查脚本",
+      "relation": "CREATES",
+      "fact": "ziyadyao 使用 Unreal Python 开发了抽查脚本，用于对公共资产进行抽查验证。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e31",
+      "source": "依赖校验脚本",
+      "target": "unreal_python",
+      "relation": "USES",
+      "fact": "依赖校验脚本基于 Unreal Python 开发，运行于 Unreal Engine 环境中。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e32",
+      "source": "抽查脚本",
+      "target": "unreal_python",
+      "relation": "USES",
+      "fact": "抽查脚本基于 Unreal Python 开发，运行于 Unreal Engine 环境中。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e33",
+      "source": "依赖校验脚本",
+      "target": "公共资产完整性",
+      "relation": "VALIDATES",
+      "fact": "依赖校验脚本用于验证公共资产的完整性，确保迁移资产无缺失。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e34",
+      "source": "ziyadyao",
+      "target": "资产迁移",
+      "relation": "MIGRATES",
+      "fact": "ziyadyao 完成了 607 个迁移资产及其依赖路径修复的工作。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e35",
+      "source": "ziyadyao",
+      "target": "svn",
+      "relation": "USES",
+      "fact": "ziyadyao 通过 SVN 完成了 607 个迁移资产及其依赖路径修复的提交。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e36",
+      "source": "ziyadyao",
+      "target": "svn冲突",
+      "relation": "FIXES",
+      "fact": "ziyadyao 在资产迁移过程中解决了 SVN 冲突问题。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e37",
+      "source": "ziyadyao",
+      "target": "git",
+      "relation": "CONFIGURES",
+      "fact": "ziyadyao 调整了 Git 的忽略规则，以支持项目配置文件的版本控制。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e38",
+      "source": "资产迁移",
+      "target": "svn",
+      "relation": "DEPENDS_ON",
+      "fact": "资产迁移工作依赖 SVN 进行版本提交和冲突管理。",
+      "valid_at": "2026-03-26T14:35:38.706Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-26"
+      ]
+    },
+    {
+      "id": "e39",
+      "source": "hughes",
+      "target": "dpar集成项目",
+      "relation": "DEVELOPS",
+      "fact": "hughes在DPAR集成项目中完成了多项关键开发和修复工作",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e40",
+      "source": "hughes",
+      "target": "svn_system账户认证",
+      "relation": "CONFIGURES",
+      "fact": "hughes配置了SVN的SYSTEM账户认证，修复了PsExec配置和用户名格式问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e41",
+      "source": "hughes",
+      "target": "psexec",
+      "relation": "FIXES",
+      "fact": "hughes修复了PsExec的配置问题和用户名格式错误",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e42",
+      "source": "psexec",
+      "target": "svn_system账户认证",
+      "relation": "CONFIGURES",
+      "fact": "PsExec被用于配置SVN的SYSTEM账户认证",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e43",
+      "source": "hughes",
+      "target": "multiprocessing包装器",
+      "relation": "FIXES",
+      "fact": "hughes修复了multiprocessing包装器的兼容性问题，使流水线在PakChunkNew阶段能够正常执行",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e44",
+      "source": "multiprocessing包装器",
+      "target": "pakchunknew阶段",
+      "relation": "DEPENDS_ON",
+      "fact": "流水线在PakChunkNew阶段的正常执行依赖于multiprocessing包装器的兼容性",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e45",
+      "source": "hughes",
+      "target": "apk资产加载失败",
+      "relation": "DEBUGS",
+      "fact": "hughes调试并解决了APK资产加载失败问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e46",
+      "source": "defaultgame.ini",
+      "target": "apk资产加载失败",
+      "relation": "CAUSES",
+      "fact": "DefaultGame.ini中公共资产配置缺失导致了APK资产加载失败问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e47",
+      "source": "hughes",
+      "target": "defaultgame.ini",
+      "relation": "FIXES",
+      "fact": "hughes修复了DefaultGame.ini中公共资产配置缺失的问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e48",
+      "source": "hughes",
+      "target": "nevercook_ini配置",
+      "relation": "FIXES",
+      "fact": "hughes修复了NeverCook INI配置的section header问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e49",
+      "source": "nevercook_ini配置",
+      "target": "蓝图编译错误",
+      "relation": "CAUSES",
+      "fact": "NeverCook INI配置的section header问题导致了大量蓝图编译错误",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e50",
+      "source": "hughes",
+      "target": "dpar_build_wrapper",
+      "relation": "CREATES",
+      "fact": "hughes实现了DPAR Build Wrapper，并修复了其中DPAR_COOKED_CHECK_DIR的硬编码路径问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e51",
+      "source": "dpar_build_wrapper",
+      "target": "dpar_cooked_check_dir",
+      "relation": "CONFIGURES",
+      "fact": "DPAR Build Wrapper中原本对DPAR_COOKED_CHECK_DIR使用了硬编码路径，经hughes修复后改为动态配置",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e52",
+      "source": "hughes",
+      "target": "fork_pipeline.yaml",
+      "relation": "FIXES",
+      "fact": "hughes修复了fork_pipeline.yaml中COOK_EXIT变量的处理问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e53",
+      "source": "fork_pipeline.yaml",
+      "target": "cook_exit变量",
+      "relation": "CONFIGURES",
+      "fact": "fork_pipeline.yaml中包含COOK_EXIT变量的处理逻辑，该逻辑存在缺陷",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e54",
+      "source": "hughes",
+      "target": "资产扫描与批量cook",
+      "relation": "MIGRATES",
+      "fact": "hughes重构了资产扫描和批量Cook过程，解决了命令行参数超长限制问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e55",
+      "source": "资产扫描与批量cook",
+      "target": "命令行参数超长限制",
+      "relation": "CAUSES",
+      "fact": "资产扫描与批量Cook过程中产生了命令行参数超长限制的问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e56",
+      "source": "hughes",
+      "target": "白名单配置",
+      "relation": "FIXES",
+      "fact": "hughes修复了白名单配置错误，解决了feature pak缺失的问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e57",
+      "source": "白名单配置",
+      "target": "feature_pak缺失",
+      "relation": "CAUSES",
+      "fact": "白名单配置错误导致了feature pak文件缺失的问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e58",
+      "source": "hughes",
+      "target": "build.py",
+      "relation": "DEVELOPS",
+      "fact": "hughes在Build.py中实现了UFS路径保存恢复逻辑，解决了Lua脚本加载问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e59",
+      "source": "ufs路径保存恢复逻辑",
+      "target": "lua脚本加载问题",
+      "relation": "FIXES",
+      "fact": "Build.py中实现的UFS路径保存恢复逻辑解决了Lua脚本无法正常加载的问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e60",
+      "source": "build.py",
+      "target": "ufs路径保存恢复逻辑",
+      "relation": "CONTAINS",
+      "fact": "Build.py中包含了hughes实现的UFS路径保存恢复逻辑",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e61",
+      "source": "hughes",
+      "target": "csv文件问题",
+      "relation": "FIXES",
+      "fact": "hughes修复了CSV文件问题并优化了Pak阶段的文件检索逻辑",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e62",
+      "source": "hughes",
+      "target": "pak阶段文件检索逻辑",
+      "relation": "DEVELOPS",
+      "fact": "hughes优化了Pak阶段的文件检索逻辑",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e63",
+      "source": "hughes",
+      "target": "ugc地图崩溃",
+      "relation": "DEBUGS",
+      "fact": "hughes分析了UGC地图崩溃问题，发现其根因为蓝图与C++类迁移的兼容性问题",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e64",
+      "source": "蓝图与c++类迁移兼容性",
+      "target": "ugc地图崩溃",
+      "relation": "CAUSES",
+      "fact": "蓝图类迁移到C++类时产生的兼容性问题导致了UGC地图运行时崩溃",
+      "valid_at": "2026-03-27T07:54:58.672Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-03-27"
+      ]
+    },
+    {
+      "id": "e65",
+      "source": "ziyadyao",
+      "target": "unreal编辑器",
+      "relation": "USES",
+      "fact": "ziyadyao使用Unreal编辑器进行大量关卡场景搭建与调整工作。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e66",
+      "source": "ziyadyao",
+      "target": "竞技场关卡场景",
+      "relation": "CREATES",
+      "fact": "ziyadyao在Unreal编辑器中对竞技场墙体、地面、障碍物和敌方坦克进行了批量生成与布局优化。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e67",
+      "source": "ziyadyao",
+      "target": "map.json配置驱动地图生成方案",
+      "relation": "DEVELOPS",
+      "fact": "ziyadyao尝试通过map.json配置驱动地图生成方案来实现地图的自动化生成。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e68",
+      "source": "map.json",
+      "target": "map.json配置驱动地图生成方案",
+      "relation": "CONFIGURES",
+      "fact": "map.json作为配置文件驱动地图生成方案的执行。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e69",
+      "source": "ziyadyao",
+      "target": "缩放和贴地问题",
+      "relation": "DEBUGS",
+      "fact": "ziyadyao在地图生成过程中排查了物体缩放比例和贴地不正确的问题。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e70",
+      "source": "缩放和贴地问题",
+      "target": "map.json配置驱动地图生成方案",
+      "relation": "DEPENDS_ON",
+      "fact": "缩放和贴地问题出现在map.json配置驱动地图生成的过程中。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e71",
+      "source": "ziyadyao",
+      "target": "_mo加载异常",
+      "relation": "DEBUGS",
+      "fact": "ziyadyao对_MO加载异常问题进行了持续调试排查。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e72",
+      "source": "ziyadyao",
+      "target": "坦克战lua角色挂载问题",
+      "relation": "DEBUGS",
+      "fact": "ziyadyao对坦克战项目中Lua/UnLua角色挂载问题进行了持续调试排查。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e73",
+      "source": "坦克战lua角色挂载问题",
+      "target": "lua",
+      "relation": "DEPENDS_ON",
+      "fact": "坦克战角色挂载问题涉及Lua脚本的使用与集成。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e74",
+      "source": "坦克战lua角色挂载问题",
+      "target": "unlua",
+      "relation": "DEPENDS_ON",
+      "fact": "坦克战角色挂载问题涉及UnLua框架的配置与使用。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e75",
+      "source": "lua",
+      "target": "unlua",
+      "relation": "USES",
+      "fact": "Lua脚本通过UnLua框架集成到Unreal引擎中实现角色逻辑挂载。",
+      "valid_at": "2026-03-28T18:48:50.525Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-03-28"
+      ]
+    },
+    {
+      "id": "e76",
+      "source": "ziyadyao",
+      "target": "流水线yaml构建逻辑",
+      "relation": "DEBUGS",
+      "fact": "ziyadyao对比了流水线YAML构建逻辑与本地已跑通的构建脚本，发现现有方案更像内联脚本硬编码方式。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e77",
+      "source": "ziyadyao",
+      "target": "流水线dpar内联脚本硬编码方案",
+      "relation": "DISCOVERS",
+      "fact": "ziyadyao确认现有流水线DPAR更像内联脚本硬编码方案，存在可维护性问题。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e78",
+      "source": "ziyadyao",
+      "target": "本地python化流程",
+      "relation": "CREATES",
+      "fact": "ziyadyao确定了用本地Python化流程替换现有内联脚本硬编码方案的优化方向。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e79",
+      "source": "本地python化流程",
+      "target": "流水线dpar内联脚本硬编码方案",
+      "relation": "MIGRATES",
+      "fact": "本地Python化流程被用于替换现有流水线DPAR内联脚本硬编码方案，以提高可维护性。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e80",
+      "source": "ziyadyao",
+      "target": "android出包流程",
+      "relation": "FIXES",
+      "fact": "ziyadyao完成了Android出包流程的重构与修复提交，将核心打包逻辑收敛到Python脚本中。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e81",
+      "source": "ziyadyao",
+      "target": "windowsclient构建路径",
+      "relation": "DEBUGS",
+      "fact": "ziyadyao排查了Android与WindowsClient构建路径之间的差异。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e82",
+      "source": "android出包流程",
+      "target": "windowsclient构建路径",
+      "relation": "DEPENDS_ON",
+      "fact": "Android出包流程与WindowsClient构建路径存在差异，需要分别排查处理。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e83",
+      "source": "android出包流程",
+      "target": "python打包脚本",
+      "relation": "USES",
+      "fact": "Android出包流程重构后，核心打包逻辑被收敛到Python脚本中以提高可维护性。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e84",
+      "source": "ziyadyao",
+      "target": "python打包脚本",
+      "relation": "CREATES",
+      "fact": "ziyadyao将核心打包逻辑收敛到Python脚本中，作为构建流程优化的核心产出。",
+      "valid_at": "2026-04-02T13:07:08.408Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e85",
+      "source": "ziyadyao",
+      "target": "dpar打包流程",
+      "relation": "DEBUGS",
+      "fact": "ziyadyao排查了DPAR打包流程中资产未被打进pak的问题",
+      "valid_at": "2026-04-02T13:26:09.082Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e86",
+      "source": "dpar配置",
+      "target": "dpar打包流程",
+      "relation": "CONFIGURES",
+      "fact": "DPAR配置用于控制DPAR打包流程，当前配置内容异常偏空，导致打包异常",
+      "valid_at": "2026-04-02T13:26:09.082Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e87",
+      "source": "ps资产",
+      "target": "pak文件",
+      "relation": "DEPENDS_ON",
+      "fact": "PS资产需要被正确打入pak文件，但当前日志和产物中没有PS资产成功进入pak的证据",
+      "valid_at": "2026-04-02T13:26:09.082Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e88",
+      "source": "ziyadyao",
+      "target": "csv残留测试条目",
+      "relation": "DISCOVERS",
+      "fact": "ziyadyao确认了CSV中存在已不在SVN的残留测试条目，需要进行清理",
+      "valid_at": "2026-04-02T13:26:09.082Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e89",
+      "source": "csv残留测试条目",
+      "target": "svn",
+      "relation": "DEPENDS_ON",
+      "fact": "CSV中的残留测试条目所引用的资产已不存在于SVN中，属于无效条目",
+      "valid_at": "2026-04-02T13:26:09.082Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e90",
+      "source": "ziyadyao",
+      "target": "chunk打包状态异常",
+      "relation": "DISCOVERS",
+      "fact": "ziyadyao发现部分目标资源的chunk/打包状态需要通过配置与产物一致性来确认，存在不一致问题",
+      "valid_at": "2026-04-02T13:26:09.082Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e91",
+      "source": "ziyadyao",
+      "target": "skill提示词机制",
+      "relation": "DISCOVERS",
+      "fact": "ziyadyao调研了skill提示词机制的运作方式",
+      "valid_at": "2026-04-02T13:26:09.082Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e92",
+      "source": "ziyadyao",
+      "target": "claude_code",
+      "relation": "DISCOVERS",
+      "fact": "ziyadyao调研了Claude Code的开源许可证性质",
+      "valid_at": "2026-04-02T13:26:09.082Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-ziyadyao-2026-04-02"
+      ]
+    },
+    {
+      "id": "e93",
+      "source": "hughes",
+      "target": "dpar项目",
+      "relation": "DEBUGS",
+      "fact": "hughes深入研究并理解了DPAR项目的完整构建流程。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e94",
+      "source": "主cook",
+      "target": "publicassets",
+      "relation": "EXCLUDES",
+      "fact": "主Cook通过NeverCook配置排除PublicAssets，只处理/Game/路径下的其他资源。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e95",
+      "source": "dpar_cook",
+      "target": "publicassets",
+      "relation": "PROCESSES",
+      "fact": "DPAR Cook单独处理PublicAssets并将其打包为dpar_*.pak文件。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e96",
+      "source": "dpar_cook",
+      "target": "dpar_*.pak",
+      "relation": "CREATES",
+      "fact": "DPAR Cook将PublicAssets打包生成dpar_*.pak文件。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e97",
+      "source": "puffer",
+      "target": "dpar_*.pak",
+      "relation": "DISTRIBUTES",
+      "fact": "Puffer负责将DPAR Cook生成的dpar_*.pak分发给客户端。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e98",
+      "source": "publicassets挂载时序问题",
+      "target": "path_does_not_start_with_a_valid_root",
+      "relation": "CAUSES",
+      "fact": "3/30全量Cook时PublicAssets挂载点未注册，导致引擎报出'Path does not start with a valid root'错误。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e99",
+      "source": "path_does_not_start_with_a_valid_root",
+      "target": "markedfailedsavekept机制",
+      "relation": "TRIGGERS",
+      "fact": "引擎报'Path does not start with a valid root'错误导致所有依赖PublicAssets的BP保存失败，并被增量Cook的MarkedFailedSaveKept机制永久缓存跳过。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e100",
+      "source": "hughes",
+      "target": "developmentassetregistry.bin",
+      "relation": "FIXES",
+      "fact": "hughes通过删除DevelopmentAssetRegistry.bin清除了增量Cook的失败缓存，修复了BP被永久跳过的问题。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e101",
+      "source": "挂载配置前置修复",
+      "target": "publicassets挂载时序问题",
+      "relation": "FIXES",
+      "fact": "将挂载配置前置，确保挂载点在Cook开始前已注册，从而修复了PublicAssets挂载时序导致的核心问题。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e102",
+      "source": "hughes",
+      "target": "挂载配置前置修复",
+      "relation": "CREATES",
+      "fact": "hughes提出并实施了挂载配置前置的修复方案以解决PublicAssets挂载时序问题。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e103",
+      "source": "puffer",
+      "target": "dolphin",
+      "relation": "DEPENDS_ON",
+      "fact": "Puffer与Dolphin共同构成版本更新机制，客户端通过Dolphin直接跳到最新Res版本，不同App大版本线互不干扰。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e104",
+      "source": "hughes",
+      "target": "markedfailedsavekept机制",
+      "relation": "DISCOVERS",
+      "fact": "hughes理解了UE4增量Cook中MarkedFailedSaveKept机制会将保存失败的资源永久缓存并跳过的行为。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    },
+    {
+      "id": "e105",
+      "source": "hughes",
+      "target": "redirector",
+      "relation": "DISCOVERS",
+      "fact": "hughes理解了Redirector在Cooked构建中的特殊行为。",
+      "valid_at": "2026-04-03T08:59:01.890Z",
+      "invalid_at": null,
+      "episodes": [
+        "ep-hughes-2026-04-03"
+      ]
+    }
+  ]
+}

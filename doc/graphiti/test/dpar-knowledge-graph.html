@@ -1,0 +1,2452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DPAR 知识图谱 — Graphiti Pipeline</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Share+Tech+Mono&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-void: #020810;
+    --bg-surface: #06101e;
+    --bg-elevated: #0a1628;
+    --bg-card: #081220;
+
+    /* ── Blue Spectrum ── */
+    --blue-electric: #00c8ff;
+    --blue-electric-glow: rgba(0, 200, 255, 0.4);
+
+    --blue-ice: #64e4ff;
+    --blue-ice-glow: rgba(100, 228, 255, 0.35);
+
+    --blue-deep: #3a7bff;
+    --blue-deep-glow: rgba(58, 123, 255, 0.4);
+
+    --blue-violet: #6e5cff;
+    --blue-violet-glow: rgba(110, 92, 255, 0.35);
+
+    --blue-steel: #4a90d9;
+    --blue-steel-glow: rgba(74, 144, 217, 0.3);
+
+    --accent: #00c8ff;
+    --accent-bright: #64e4ff;
+    --accent-glow: rgba(0, 200, 255, 0.35);
+
+    --text-primary: #c8d8f0;
+    --text-secondary: #7088b0;
+    --text-tertiary: #3a5078;
+    --text-faint: #1e3050;
+
+    --grid-line: rgba(0, 200, 255, 0.025);
+    --border: rgba(0, 200, 255, 0.08);
+    --border-hover: rgba(0, 200, 255, 0.22);
+
+    --edge-default: #142240;
+    --edge-expired: #0c1628;
+  }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: 'Exo 2', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+
+  /* ── Background ── */
+  #graph-container {
+    flex: 1;
+    position: relative;
+    background:
+      radial-gradient(ellipse 60% 50% at 12% 30%, rgba(0,200,255,0.03) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 82% 55%, rgba(58,123,255,0.025) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 35% at 50% 12%, rgba(110,92,255,0.03) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 80% at 50% 85%, rgba(0,200,255,0.012) 0%, transparent 70%),
+      var(--bg-void);
+  }
+
+  /* Grid */
+  #graph-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, var(--grid-line) 0px, transparent 1px, transparent 80px),
+      repeating-linear-gradient(90deg, var(--grid-line) 0px, transparent 1px, transparent 80px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanline */
+  #graph-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(180deg, transparent 0px, rgba(0,0,0,0.012) 2px, transparent 4px);
+    pointer-events: none;
+    z-index: 0;
+    animation: scanMove 8s linear infinite;
+  }
+  @keyframes scanMove {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(4px); }
+  }
+
+  svg { width: 100%; height: 100%; position: relative; z-index: 1; }
+  .node-glow { filter: url(#glow); }
+
+  /* ── Detail Panel ── */
+  #detail-panel {
+    width: 400px;
+    min-width: 400px;
+    background: linear-gradient(175deg, var(--bg-surface) 0%, #030a14 100%);
+    border-left: 1px solid var(--border);
+    padding: 36px 28px;
+    overflow-y: auto;
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: -30px 0 80px rgba(0, 0, 0, 0.6);
+    position: relative;
+  }
+  #detail-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--blue-deep), var(--blue-electric), var(--blue-ice));
+    opacity: 0.5;
+  }
+  #detail-panel::-webkit-scrollbar { width: 3px; }
+  #detail-panel::-webkit-scrollbar-track { background: transparent; }
+  #detail-panel::-webkit-scrollbar-thumb { background: var(--blue-deep); border-radius: 3px; opacity: 0.5; }
+  #detail-panel::-webkit-scrollbar-thumb:hover { background: var(--blue-electric); }
+
+  #detail-panel.hidden {
+    transform: translateX(100%);
+    width: 0; min-width: 0; padding: 0;
+    border: none; overflow: hidden; box-shadow: none;
+  }
+
+  #detail-panel h2 {
+    font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #fff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px var(--accent-glow);
+  }
+  #detail-panel .type-badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-bottom: 22px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+  #detail-panel .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--blue-electric);
+    margin: 30px 0 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-shadow: 0 0 8px var(--blue-electric-glow);
+  }
+  #detail-panel .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(0,200,255,0.2), transparent);
+  }
+  #detail-panel .fact-text {
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--text-secondary);
+    background: linear-gradient(135deg, rgba(6,16,30,0.95), rgba(4,12,24,0.95));
+    padding: 18px 20px;
+    border-radius: 4px;
+    border-left: 2px solid var(--blue-electric);
+    margin-bottom: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 0 30px rgba(0,200,255,0.015);
+    position: relative;
+  }
+  #detail-panel .fact-text::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 2px; height: 100%;
+    background: var(--blue-electric);
+    box-shadow: 0 0 8px var(--blue-electric-glow), 0 0 20px var(--blue-electric-glow);
+  }
+  #detail-panel .meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 11px 0;
+    border-bottom: 1px solid rgba(20,34,64,0.5);
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+  #detail-panel .meta-row:hover {
+    background: rgba(0,200,255,0.03);
+    margin: 0 -10px;
+    padding: 11px 10px;
+    border-radius: 4px;
+  }
+  #detail-panel .meta-row .label { color: var(--text-tertiary); font-weight: 500; letter-spacing: 0.3px; }
+  #detail-panel .meta-row .value {
+    color: var(--text-secondary);
+    text-align: right;
+    max-width: 220px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+  }
+
+  #detail-panel .edge-list-item {
+    background: linear-gradient(135deg, rgba(6,16,30,0.8), rgba(4,12,24,0.8));
+    padding: 15px 18px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    border: 1px solid rgba(0,200,255,0.05);
+    position: relative;
+    overflow: hidden;
+  }
+  #detail-panel .edge-list-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0;
+    background: linear-gradient(90deg, rgba(0,200,255,0.08), transparent);
+    transition: width 0.3s;
+  }
+  #detail-panel .edge-list-item:hover::before { width: 100%; }
+  #detail-panel .edge-list-item:hover {
+    border-color: var(--border-hover);
+    transform: translateX(6px);
+    box-shadow: 0 0 20px rgba(0,200,255,0.06), inset 0 0 20px rgba(0,200,255,0.02);
+  }
+  #detail-panel .edge-list-item .rel {
+    color: var(--blue-ice);
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+    text-shadow: 0 0 6px var(--blue-ice-glow);
+  }
+  #detail-panel .edge-list-item .target { color: var(--text-secondary); margin-left: 8px; position: relative; z-index: 1; }
+
+  #close-panel {
+    position: absolute;
+    top: 20px;
+    right: 18px;
+    background: rgba(0,200,255,0.04);
+    border: 1px solid rgba(0,200,255,0.12);
+    color: var(--text-tertiary);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    width: 34px;
+    height: 34px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s;
+  }
+  #close-panel:hover {
+    color: var(--blue-ice);
+    background: rgba(0,200,255,0.08);
+    border-color: rgba(0,200,255,0.35);
+    box-shadow: 0 0 16px rgba(0,200,255,0.12);
+    text-shadow: 0 0 8px var(--blue-electric-glow);
+  }
+
+  /* ── Legend ── */
+  #legend {
+    position: absolute;
+    top: 28px;
+    left: 28px;
+    background: rgba(3, 10, 20, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+    font-size: 13px;
+    pointer-events: none;
+    backdrop-filter: blur(24px) saturate(1.3);
+    box-shadow: 0 0 40px rgba(0,0,0,0.4), inset 0 0 40px rgba(0,200,255,0.015);
+    z-index: 10;
+    position: relative;
+  }
+  #legend::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--blue-deep), var(--blue-electric), var(--blue-ice));
+    opacity: 0.4;
+  }
+  #legend .title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--blue-electric);
+    margin-bottom: 16px;
+    font-weight: 700;
+    text-shadow: 0 0 10px var(--blue-electric-glow);
+  }
+  #legend .item { display: flex; align-items: center; margin-bottom: 11px; }
+  #legend .item:last-child { margin-bottom: 0; }
+  #legend .dot {
+    width: 6px; height: 6px; margin-right: 14px; flex-shrink: 0;
+    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+  #legend .item-label {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-size: 12px;
+    font-family: 'Exo 2', 'Noto Sans SC', sans-serif;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Stats Bar ── */
+  #stats-bar {
+    position: absolute;
+    top: 28px;
+    right: 28px;
+    display: flex;
+    gap: 10px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .stat-chip {
+    background: rgba(3, 10, 20, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 18px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    backdrop-filter: blur(24px) saturate(1.3);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    font-family: 'Exo 2', sans-serif;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-chip::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--blue-electric), transparent);
+    opacity: 0.25;
+  }
+  .stat-chip .stat-num {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    text-shadow: 0 0 12px var(--blue-electric-glow);
+  }
+
+  /* ── Title ── */
+  #title-bar {
+    position: absolute;
+    bottom: 32px;
+    left: 32px;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+  }
+  #title-bar .main-title {
+    font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-shadow: 0 0 20px var(--blue-electric-glow);
+  }
+  #title-bar .main-title .logo-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--blue-electric);
+    box-shadow: 0 0 12px var(--blue-electric-glow), 0 0 30px var(--blue-electric-glow);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 12px var(--blue-electric-glow), 0 0 30px var(--blue-electric-glow); }
+    50% { opacity: 0.3; box-shadow: 0 0 4px var(--blue-electric-glow); }
+  }
+  #title-bar .sub-title {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-left: 20px;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    font-family: 'Share Tech Mono', monospace;
+    text-transform: uppercase;
+  }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(3, 10, 20, 0.96);
+    border: 1px solid var(--border-hover);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-width: 320px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 100;
+    backdrop-filter: blur(24px);
+    box-shadow: 0 0 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,200,255,0.04);
+  }
+
+  /* ── Keyboard Hints ── */
+  #keyboard-hint {
+    position: absolute;
+    bottom: 32px;
+    right: 32px;
+    display: flex;
+    gap: 14px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .kbd-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: 'Exo 2', sans-serif;
+  }
+  .kbd {
+    background: rgba(0,200,255,0.04);
+    border: 1px solid rgba(0,200,255,0.1);
+    border-radius: 2px;
+    padding: 3px 9px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--blue-steel);
+    text-shadow: 0 0 4px var(--blue-steel-glow);
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes glitchIn {
+    0% { opacity: 0; transform: translateX(-4px) skewX(-2deg); }
+    40% { opacity: 0.8; transform: translateX(2px) skewX(1deg); }
+    60% { opacity: 0.9; transform: translateX(-1px) skewX(0deg); }
+    100% { opacity: 1; transform: translateX(0) skewX(0deg); }
+  }
+  #legend { animation: glitchIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  #stats-bar { animation: glitchIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+  #title-bar { animation: glitchIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
+  #keyboard-hint { animation: fadeIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both; }
+</style>
+</head>
+<body>
+<div id="graph-container">
+  <svg id="graph-svg">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="glow-strong" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="12" result="coloredBlur"/>
+        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <marker id="arrow" viewBox="0 0 10 6" refX="28" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,3 L0,6 Z" fill="#142240"/>
+      </marker>
+      <marker id="arrow-highlight" viewBox="0 0 10 6" refX="28" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,3 L0,6 Z" fill="#00c8ff"/>
+      </marker>
+    </defs>
+  </svg>
+  <div id="legend">
+    <div class="title">Node Types</div>
+    <div class="item"><div class="dot" style="background:#64e4ff;color:#64e4ff"></div><span class="item-label">人物</span></div>
+    <div class="item"><div class="dot" style="background:#3a7bff;color:#3a7bff"></div><span class="item-label">技术 / 工具</span></div>
+    <div class="item"><div class="dot" style="background:#6e5cff;color:#6e5cff"></div><span class="item-label">文档 / 文件</span></div>
+    <div class="item"><div class="dot" style="background:#ff8c42;color:#ff8c42"></div><span class="item-label">概念 / 方案</span></div>
+  </div>
+  <div id="stats-bar">
+    <div class="stat-chip"><span class="stat-num" id="node-count">0</span>Nodes</div>
+    <div class="stat-chip"><span class="stat-num" id="edge-count">0</span>Edges</div>
+  </div>
+  <div id="title-bar">
+    <div class="main-title"><div class="logo-dot"></div>DPAR Knowledge Graph</div>
+    <div class="sub-title">graphiti pipeline // kuzu embedded // dpar_export.db</div>
+  </div>
+  <div id="keyboard-hint">
+    <div class="kbd-item"><span class="kbd">Scroll</span> Zoom</div>
+    <div class="kbd-item"><span class="kbd">Drag</span> Move</div>
+    <div class="kbd-item"><span class="kbd">Click</span> Detail</div>
+  </div>
+  <div id="tooltip"></div>
+</div>
+<div id="detail-panel" class="hidden">
+  <button id="close-panel">&times;</button>
+  <div id="panel-content"></div>
+</div>
+<script>
+const nodes = [
+  {
+    "id": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "label": "ziyadyao",
+    "type": "person",
+    "summary": "ziyadyao 完成了 SVN 资产引用修复脚本的增强（v3版本）\nziyadyao 分析了 dry run 报告中断裂引用的分布情况\nziyadyao 配置了 Continue AI 代码助手\nziyadyao 排查了 UGC 玩法本地 Cook 后无法进入的问题\nziyadyao 回溯了 ClientTools 的开发历史\nziyadyao 回溯了 DPAR 离散化方案的关键决策\nziyadyao 回溯了 UGC 离散化方案的关键决策\nziyadyao 在资产迁移领域进行了大量工作\nziyadyao 使用 Unreal Python 开发了依赖校验脚本\nziyadyao 使用 Unreal Python 开发了抽查脚本\nziyadyao 完成了 607 个迁移资产及其依赖路径修复的 SVN 提交\nziyadyao 调整了 Git 忽略规则以支持项目配置文件的版本控制\nziyadyao在Unreal编辑器中进行了大量关卡场景搭建与调整工作\nziyadyao对竞技场墙体进行了批量生成与布局优化\nziyadyao对地面进行了批量生成与布局优化\nziyadyao对障碍物进行了批量生成与布局优化\nziyadyao对敌方坦克进行了批量生成与布局优化\nziyadyao尝试通过map.json配置驱动地图生成，并排查缩放和贴地问题\nziyadyao对_MO加载异常问题进行了持续调试排查\nziyadyao对坦克战Lua/UnLua角色挂载问题进行了持续调试排查\nziyadyao对比了流水线YAML构建逻辑与本地已跑通的构建脚本\nziyadyao对比了流水线YAML构建逻辑与本地已跑通的构建脚本\nziyadyao确定了用本地Python化流程替换现有DPAR内联脚本硬编码方案的优化方向\nziyadyao排查了Android与WindowsClient构建路径差异\nziyadyao排查了Android与WindowsClient构建路径差异\nziyadyao完成了Android出包流程重构与修复提交\nziyadyao排查了DPAR打包流程中资产未被打进pak的问题\nziyadyao调研了skill提示词机制\nziyadyao调研了Claude Code的开源许可证性质",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "ba8390be-a2e9-4bf1-8290-96b8f7cef617",
+    "label": "SVN 资产引用修复脚本",
+    "type": "document",
+    "summary": "ziyadyao 完成了 SVN 资产引用修复脚本的增强（v3版本）\nSVN 资产引用修复脚本 v3 新增了对 MaterialFunction 类型的专门处理逻辑",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "2d0d13ff-d072-43d0-ac79-df47c5692d7b",
+    "label": "MaterialFunction",
+    "type": "concept",
+    "summary": "SVN 资产引用修复脚本 v3 新增了对 MaterialFunction 类型的专门处理逻辑",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "b362729c-a9ff-4605-8ab1-3af0b8ec4104",
+    "label": "dry run 报告",
+    "type": "document",
+    "summary": "ziyadyao 分析了 dry run 报告中断裂引用的分布情况\ndry run 报告中包含 607 个 uasset 的断裂引用分布数据",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "59b770d2-6eab-4903-8412-0bdaa6d093cc",
+    "label": "uasset",
+    "type": "concept",
+    "summary": "dry run 报告中包含 607 个 uasset 的断裂引用分布数据",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "cec10418-7d37-43ca-a4bc-5e62a0f645b1",
+    "label": "Continue AI 代码助手",
+    "type": "concept",
+    "summary": "ziyadyao 配置了 Continue AI 代码助手\nContinue AI 代码助手对接了第三方代理 API——TIMI AI 平台\nContinue AI 代码助手对接了第三方代理 API——Venus 平台",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "ec551dd4-f1d4-4745-984d-3a6e75c7f71c",
+    "label": "TIMI AI 平台",
+    "type": "concept",
+    "summary": "Continue AI 代码助手对接了第三方代理 API——TIMI AI 平台",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "072a2125-e846-4046-b519-cb225f1fb267",
+    "label": "Venus 平台",
+    "type": "concept",
+    "summary": "Continue AI 代码助手对接了第三方代理 API——Venus 平台",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "0391b053-d23b-4dce-9a08-f4e5d24469c8",
+    "label": "UGC 玩法",
+    "type": "concept",
+    "summary": "ziyadyao 排查了 UGC 玩法本地 Cook 后无法进入的问题\nhughes分析了UGC地图崩溃问题\nUGC地图崩溃问题与蓝图和C++类迁移兼容性问题有关\nUGC地图崩溃问题与蓝图和C++类迁移兼容性问题有关",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "ab200b50-f318-4cf8-84a9-4b7693c44b08",
+    "label": "ClientTools",
+    "type": "concept",
+    "summary": "ziyadyao 回溯了 ClientTools 的开发历史\nClientTools 包含 OnAnalyzeFolderDependencies 功能",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "d65edeb3-bb49-4e1c-989d-e134e64f0689",
+    "label": "OnAnalyzeFolderDependencies",
+    "type": "concept",
+    "summary": "ClientTools 包含 OnAnalyzeFolderDependencies 功能",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "4a00d569-3f4b-4f0d-9432-874e039325fc",
+    "label": "DPAR",
+    "type": "concept",
+    "summary": "ziyadyao 回溯了 DPAR 离散化方案的关键决策\nhughes完成了DPAR流水线从QuickGenAPP到cookpak模式的转换\nDPAR流水线从QuickGenAPP模式转换为cookpak模式\nDPAR流水线转换为cookpak模式\nhughes在DPAR集成项目中完成了多项关键工作\n现有流水线DPAR更像内联脚本硬编码方案\nhughes深入理解了DPAR项目的完整构建流程。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "4c4c93d2-2b33-4c83-b113-1b36123435ce",
+    "label": "UGC 离散化方案",
+    "type": "concept",
+    "summary": "ziyadyao 回溯了 UGC 离散化方案的关键决策",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "label": "hughes",
+    "type": "person",
+    "summary": "hughes完成了DPAR流水线从QuickGenAPP到cookpak模式的转换\nhughes修复了SVN认证和路径不匹配问题\nhughes修复了APK启动卡顿的热更新问题\nhughes深入理解了UE4硬引用与软引用在Cook中的行为差异\nhughes在DPAR集成项目中完成了多项关键工作\nhughes配置了SVN的SYSTEM账户认证\nhughes修复了PsExec配置和用户名格式问题\nhughes修复了multiprocessing包装器兼容性问题\nhughes解决了APK资产加载失败问题\nhughes修复了NeverCook INI配置的section header问题\nhughes实现了DPAR Build Wrapper\nhughes修复了fork_pipeline.yaml中COOK_EXIT变量处理问题\nhughes重构了Build.py中资产扫描和批量Cook过程，解决命令行参数超长限制\nhughes在Build.py中实现了UFS路径保存恢复逻辑\nhughes修复了CSV文件问题，并优化了Pak阶段文件检索逻辑\nhughes修复了白名单配置导致的feature pak缺失问题\nhughes分析了UGC地图崩溃问题\nhughes深入理解了DPAR项目的完整构建流程。\nhughes通过删除DevelopmentAssetRegistry.bin清除了BP保存失败的增量Cook缓存。\nhughes理解了Redirector在Cooked构建中的行为。\nhughes理解了UE4增量Cook的MarkedFailedSaveKept机制。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "feafd0ae-5621-4b95-b55a-4da130ee0464",
+    "label": "QuickGenAPP",
+    "type": "concept",
+    "summary": "DPAR流水线从QuickGenAPP模式转换为cookpak模式",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "fee5419c-2956-4492-bd8c-ce372a57a8dc",
+    "label": "cookpak",
+    "type": "tech",
+    "summary": "DPAR流水线转换为cookpak模式",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "4befaf1e-8ec8-4421-a07d-a6647aaac92e",
+    "label": "SVN认证",
+    "type": "tech",
+    "summary": "hughes修复了SVN认证和路径不匹配问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "8f0c6240-c590-4f9e-b128-07f848e0cd9e",
+    "label": "dpar_build_wrapper.py",
+    "type": "document",
+    "summary": "dpar_build_wrapper.py通过容错方式处理Blueprint编译错误\nhughes实现了DPAR Build Wrapper\nDPAR Build Wrapper修复了DPAR_COOKED_CHECK_DIR硬编码路径问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "5877e283-252c-4241-b2c9-6eaa18b96b62",
+    "label": "Blueprint",
+    "type": "concept",
+    "summary": "dpar_build_wrapper.py通过容错方式处理Blueprint编译错误\n修复NeverCook INI配置的section header问题后，蓝图编译错误显著减少\nUGC地图崩溃问题与蓝图和C++类迁移兼容性问题有关\n蓝图与C++类之间存在迁移兼容性问题，导致UGC地图崩溃\nBlueprint依赖PublicAssets，PublicAssets挂载时序异常导致依赖PublicAssets的BP保存失败。\nBP保存失败后被UE4增量Cook永久缓存跳过。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "a4c0883c-80aa-4feb-aecc-5ed6bdb9b358",
+    "label": "Cook过程",
+    "type": "tech",
+    "summary": "Cook过程覆写了PublicAssets源文件\nCook过程覆写PublicAssets源文件导致HotShaderDivide报'Package is too old'错误\n主Cook处理/Game/路径资源，通过NeverCook排除PublicAssets。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "bef4050f-10b6-4f00-ae84-4dc7fc045adb",
+    "label": "PublicAssets",
+    "type": "concept",
+    "summary": "Cook过程覆写了PublicAssets源文件\n主Cook处理/Game/路径资源，通过NeverCook排除PublicAssets。\nDPAR Cook单独处理PublicAssets。\nBlueprint依赖PublicAssets，PublicAssets挂载时序异常导致依赖PublicAssets的BP保存失败。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "80a082db-0cda-4f4d-b75f-07cb9be50bd7",
+    "label": "HotShaderDivide",
+    "type": "concept",
+    "summary": "Cook过程覆写PublicAssets源文件导致HotShaderDivide报'Package is too old'错误",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "0f9f3787-c157-44b3-9a44-b7a3c12e5b1d",
+    "label": "APK",
+    "type": "concept",
+    "summary": "hughes修复了APK启动卡顿的热更新问题\np_base_1被确保打入APK以修复热更新问题\np_base_2被确保打入APK以修复热更新问题\np_base_3被确保打入APK以修复热更新问题\nhughes解决了APK资产加载失败问题\nAPK资产加载失败的原因之一是DefaultGame.ini中公共资产配置缺失\nAPK资产加载失败的原因之一是SDK初始化问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "062c2597-d5fa-4823-b0a6-b5368466183b",
+    "label": "p_base_1",
+    "type": "concept",
+    "summary": "p_base_1被确保打入APK以修复热更新问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "277ce881-7304-4ff1-93a1-bf9f33444c5c",
+    "label": "p_base_2",
+    "type": "concept",
+    "summary": "p_base_2被确保打入APK以修复热更新问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "69ebd5d3-d9c3-41f2-9749-e26228d53b1b",
+    "label": "p_base_3",
+    "type": "concept",
+    "summary": "p_base_3被确保打入APK以修复热更新问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "02be4e47-c43b-45ca-bfb8-dcd2fa1bd6a7",
+    "label": "DirectoriesToNeverCook",
+    "type": "tech",
+    "summary": "DirectoriesToNeverCook被Build.py的ConfigSettingBlacklist拦截\nDirectoriesToNeverCook被ConfigSettingBlacklist拦截屏蔽\nhughes修复了NeverCook INI配置的section header问题\n修复NeverCook INI配置的section header问题后，蓝图编译错误显著减少",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "6152b7f7-632a-4dfe-b59c-b9419f422f2a",
+    "label": "Build.py",
+    "type": "document",
+    "summary": "DirectoriesToNeverCook被Build.py的ConfigSettingBlacklist拦截\nBuild.py包含ConfigSettingBlacklist机制用于拦截某些配置项\nhughes重构了Build.py中资产扫描和批量Cook过程，解决命令行参数超长限制\nhughes在Build.py中实现了UFS路径保存恢复逻辑\nBuild.py中实现了UFS路径保存恢复逻辑",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "a006ba8f-30e9-4023-91e5-39b9964cfa33",
+    "label": "ConfigSettingBlacklist",
+    "type": "concept",
+    "summary": "DirectoriesToNeverCook被ConfigSettingBlacklist拦截屏蔽\nBuild.py包含ConfigSettingBlacklist机制用于拦截某些配置项",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "4e05b38e-2340-4323-838f-047d8e6a569d",
+    "label": "UE4",
+    "type": "concept",
+    "summary": "hughes深入理解了UE4硬引用与软引用在Cook中的行为差异",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "92455a6f-3918-4532-a232-607e72e7bf59",
+    "label": "资产迁移",
+    "type": "concept",
+    "summary": "ziyadyao 在资产迁移领域进行了大量工作",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "0828182d-4279-4c02-a5f6-3f83bf8ba2a4",
+    "label": "Unreal Python",
+    "type": "tech",
+    "summary": "依赖校验脚本使用 Unreal Python 开发\n抽查脚本使用 Unreal Python 开发",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "abd5cce9-468f-403a-a8f5-3f59264ed5fe",
+    "label": "依赖校验脚本",
+    "type": "document",
+    "summary": "ziyadyao 使用 Unreal Python 开发了依赖校验脚本\n依赖校验脚本使用 Unreal Python 开发\n依赖校验脚本用于验证公共资产的完整性",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "dc82b759-9af5-4954-b41e-5b584998900e",
+    "label": "抽查脚本",
+    "type": "document",
+    "summary": "ziyadyao 使用 Unreal Python 开发了抽查脚本\n抽查脚本使用 Unreal Python 开发\n抽查脚本用于验证公共资产的完整性",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "58816a80-1543-487c-92e8-f6311c797c16",
+    "label": "公共资产",
+    "type": "concept",
+    "summary": "依赖校验脚本用于验证公共资产的完整性\n抽查脚本用于验证公共资产的完整性",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "4ccdb593-8f4f-4141-a5cb-2cbcd72fa576",
+    "label": "SVN",
+    "type": "tech",
+    "summary": "ziyadyao 完成了 607 个迁移资产及其依赖路径修复的 SVN 提交\nhughes配置了SVN的SYSTEM账户认证\nSVN配置了SYSTEM账户认证\nCSV中存在已不再SVN中的残留测试条目需要清理",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "a1a5271a-1366-4938-bb35-77b8cc97b67e",
+    "label": "Git",
+    "type": "concept",
+    "summary": "ziyadyao 调整了 Git 忽略规则以支持项目配置文件的版本控制\n调整 Git 忽略规则后，Git 支持对项目配置文件进行版本控制",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "04eef8b8-e2f7-4442-bf44-abab37c3ff42",
+    "label": "项目配置文件",
+    "type": "document",
+    "summary": "调整 Git 忽略规则后，Git 支持对项目配置文件进行版本控制",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "f171646c-550d-4bcd-a0f2-b660509ba0d9",
+    "label": "SYSTEM账户",
+    "type": "concept",
+    "summary": "SVN配置了SYSTEM账户认证",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "89f09dca-d206-4119-b304-968e5c01f36e",
+    "label": "PsExec",
+    "type": "concept",
+    "summary": "hughes修复了PsExec配置和用户名格式问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "56ee6fd2-3086-49e9-8393-f7a69bfbe317",
+    "label": "multiprocessing包装器",
+    "type": "concept",
+    "summary": "hughes修复了multiprocessing包装器兼容性问题\n修复multiprocessing包装器兼容性问题后，流水线在PakChunkNew阶段正常执行",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "ead9ba19-a47e-4c68-a3b2-3ae8103c101c",
+    "label": "PakChunkNew",
+    "type": "tech",
+    "summary": "修复multiprocessing包装器兼容性问题后，流水线在PakChunkNew阶段正常执行",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "a066124a-c5f8-42a5-b9a8-6c418f3eeefa",
+    "label": "DefaultGame.ini",
+    "type": "document",
+    "summary": "APK资产加载失败的原因之一是DefaultGame.ini中公共资产配置缺失",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "1657482b-5fa8-41c1-809b-35364a6410ee",
+    "label": "SDK",
+    "type": "concept",
+    "summary": "APK资产加载失败的原因之一是SDK初始化问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "09119984-a62b-4d35-be38-a781bf070636",
+    "label": "DPAR_COOKED_CHECK_DIR",
+    "type": "tech",
+    "summary": "DPAR Build Wrapper修复了DPAR_COOKED_CHECK_DIR硬编码路径问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "24049021-dbe2-4031-95cc-b41f13976b06",
+    "label": "fork_pipeline.yaml",
+    "type": "document",
+    "summary": "hughes修复了fork_pipeline.yaml中COOK_EXIT变量处理问题\nfork_pipeline.yaml中存在COOK_EXIT变量处理问题，已被修复",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "6c2268ec-9943-41c4-bcc1-f4fbdd577eb8",
+    "label": "COOK_EXIT变量",
+    "type": "tech",
+    "summary": "fork_pipeline.yaml中存在COOK_EXIT变量处理问题，已被修复",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "dd08489c-31e0-4b87-a06a-484b9eafc856",
+    "label": "UFS路径",
+    "type": "concept",
+    "summary": "Build.py中实现了UFS路径保存恢复逻辑\nBuild.py中UFS路径保存恢复逻辑解决了Lua脚本加载问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "d4ca891e-080a-48b4-831a-ee660e3b5d93",
+    "label": "Lua脚本",
+    "type": "document",
+    "summary": "Build.py中UFS路径保存恢复逻辑解决了Lua脚本加载问题\n坦克战存在Lua角色挂载问题需要调试排查",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "be0f0b02-ea34-41c2-b62a-30775eaba96c",
+    "label": "CSV文件",
+    "type": "document",
+    "summary": "hughes修复了CSV文件问题，并优化了Pak阶段文件检索逻辑\n修复CSV文件问题和白名单配置问题，解决了feature pak缺失的情况\nCSV中存在已不再SVN中的残留测试条目需要清理",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "8375b225-260c-458b-8fc9-170863e722a9",
+    "label": "feature pak",
+    "type": "tech",
+    "summary": "修复CSV文件问题和白名单配置问题，解决了feature pak缺失的情况\nhughes修复了白名单配置导致的feature pak缺失问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "0c17abc3-d703-4ac1-b274-20e09b68b1d1",
+    "label": "C++类",
+    "type": "concept",
+    "summary": "UGC地图崩溃问题与蓝图和C++类迁移兼容性问题有关\n蓝图与C++类之间存在迁移兼容性问题，导致UGC地图崩溃",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "f0aeb0cb-ba58-42ee-a984-689969b8b4cb",
+    "label": "Unreal编辑器",
+    "type": "tech",
+    "summary": "ziyadyao在Unreal编辑器中进行了大量关卡场景搭建与调整工作",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "0d357266-a22a-444d-b3cd-545ecbe08d45",
+    "label": "竞技场墙体",
+    "type": "concept",
+    "summary": "ziyadyao对竞技场墙体进行了批量生成与布局优化",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "9fa6bcf9-47e5-4b3c-951c-34212f04de8c",
+    "label": "地面",
+    "type": "concept",
+    "summary": "ziyadyao对地面进行了批量生成与布局优化\nmap.json配置用于驱动地图生成，涉及地面的缩放和贴地问题排查",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "2f9a5661-6e73-450e-99fa-2b38be7506f2",
+    "label": "障碍物",
+    "type": "concept",
+    "summary": "ziyadyao对障碍物进行了批量生成与布局优化",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "b3fdb8b5-52c9-4787-b5e3-6f48b8bf2535",
+    "label": "敌方坦克",
+    "type": "concept",
+    "summary": "ziyadyao对敌方坦克进行了批量生成与布局优化",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "c939b4f9-bb8d-4c7b-ba2f-b7f55b06c6b1",
+    "label": "map.json",
+    "type": "document",
+    "summary": "ziyadyao尝试通过map.json配置驱动地图生成，并排查缩放和贴地问题\nmap.json配置用于驱动地图生成，涉及地面的缩放和贴地问题排查",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "51424555-cb07-4cfd-94de-e8d6001f8f22",
+    "label": "_MO",
+    "type": "concept",
+    "summary": "ziyadyao对_MO加载异常问题进行了持续调试排查",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "23dd07fb-8f74-4620-b17d-49af39c462e5",
+    "label": "坦克战",
+    "type": "concept",
+    "summary": "ziyadyao对坦克战Lua/UnLua角色挂载问题进行了持续调试排查\n坦克战存在Lua角色挂载问题需要调试排查\n坦克战存在UnLua角色挂载问题需要调试排查",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "6276f9c2-293f-44b0-8b9a-46aa9433b052",
+    "label": "UnLua",
+    "type": "tech",
+    "summary": "坦克战存在UnLua角色挂载问题需要调试排查",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "420e27ee-0597-4af8-bfc4-520816831888",
+    "label": "流水线YAML构建逻辑",
+    "type": "concept",
+    "summary": "ziyadyao对比了流水线YAML构建逻辑与本地已跑通的构建脚本",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "09bf8fbc-e43b-4f3a-877d-d09c98129024",
+    "label": "构建脚本",
+    "type": "document",
+    "summary": "ziyadyao对比了流水线YAML构建逻辑与本地已跑通的构建脚本",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "cc9cee3a-63d4-44c4-a9cf-b10054fa03b2",
+    "label": "内联脚本硬编码方案",
+    "type": "document",
+    "summary": "现有流水线DPAR更像内联脚本硬编码方案",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "7b92467c-b271-4969-ab68-5ce476828fe5",
+    "label": "Python化流程",
+    "type": "tech",
+    "summary": "ziyadyao确定了用本地Python化流程替换现有DPAR内联脚本硬编码方案的优化方向",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "117652e7-d415-4039-b63f-b54c585bea54",
+    "label": "Android构建路径",
+    "type": "concept",
+    "summary": "ziyadyao排查了Android与WindowsClient构建路径差异",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "e18c81de-bca1-4fb9-b238-f3d0cb06cf35",
+    "label": "WindowsClient构建路径",
+    "type": "concept",
+    "summary": "ziyadyao排查了Android与WindowsClient构建路径差异",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "a1938fa2-1883-4e7f-ae6b-fc3b5fc47e18",
+    "label": "Android出包流程",
+    "type": "concept",
+    "summary": "ziyadyao完成了Android出包流程重构与修复提交\nAndroid出包流程重构将核心打包逻辑收敛到Python脚本中以提高可维护性",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "8c382dab-0d0b-48e6-ae09-85a137978397",
+    "label": "Python脚本",
+    "type": "document",
+    "summary": "Android出包流程重构将核心打包逻辑收敛到Python脚本中以提高可维护性",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "749322ec-fa31-4898-b34b-9fc917165023",
+    "label": "DPAR打包流程",
+    "type": "concept",
+    "summary": "ziyadyao排查了DPAR打包流程中资产未被打进pak的问题",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "d3a5b981-caca-44fb-b785-7bb2c42e0dce",
+    "label": "pak",
+    "type": "tech",
+    "summary": "DPAR配置内容异常偏空，导致目标PS资产没有成功进入pak的证据\n相关日志和产物中没有目标PS资产成功进入pak的证据",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "1d7ed0dc-254e-478a-9ef9-9e987a3b3e91",
+    "label": "DPAR配置",
+    "type": "concept",
+    "summary": "DPAR配置内容异常偏空，导致目标PS资产没有成功进入pak的证据\n部分目标资源的chunk/打包状态需要通过配置与产物一致性来确认",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "5f117c0f-73ad-4784-84ee-9e873a0bc9aa",
+    "label": "PS资产",
+    "type": "concept",
+    "summary": "相关日志和产物中没有目标PS资产成功进入pak的证据",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "4a3bf890-c70b-40fe-83f4-b38270ad6e56",
+    "label": "chunk打包状态",
+    "type": "concept",
+    "summary": "部分目标资源的chunk/打包状态需要通过配置与产物一致性来确认",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "605758b7-e101-416d-b143-40ec8c80bddd",
+    "label": "skill提示词机制",
+    "type": "concept",
+    "summary": "ziyadyao调研了skill提示词机制",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "ab43ded6-99d3-4ad8-b4ac-6182585b5177",
+    "label": "Claude Code",
+    "type": "concept",
+    "summary": "ziyadyao调研了Claude Code的开源许可证性质\nziyadyao调研了Claude Code的开源许可证性质",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "95035530-f9a3-4efb-89b2-7115b5f83723",
+    "label": "开源许可证",
+    "type": "concept",
+    "summary": "ziyadyao调研了Claude Code的开源许可证性质",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "38a5bdf5-4613-4cc2-b3e2-320e357e2957",
+    "label": "DPAR Cook",
+    "type": "tech",
+    "summary": "DPAR Cook单独处理PublicAssets。\nDPAR Cook将PublicAssets打成dpar_*.pak。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "04f62fef-222c-4f29-a7db-5b577e616d0b",
+    "label": "dpar_*.pak",
+    "type": "tech",
+    "summary": "DPAR Cook将PublicAssets打成dpar_*.pak。\ndpar_*.pak通过Puffer进行分发。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "4bda7528-9b64-48a8-a7a2-82e4b15eef51",
+    "label": "Puffer",
+    "type": "tech",
+    "summary": "dpar_*.pak通过Puffer进行分发。\nhughes理解了Puffer/Dolphin的版本更新机制：客户端直接跳到最新Res版本，不同App大版本线互不干扰。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "be80947c-f3b7-4e1e-9700-410ffaa61391",
+    "label": "DevelopmentAssetRegistry.bin",
+    "type": "concept",
+    "summary": "hughes通过删除DevelopmentAssetRegistry.bin清除了BP保存失败的增量Cook缓存。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "40fa83c8-cb1b-48c5-95af-753009aabfbd",
+    "label": "Dolphin",
+    "type": "tech",
+    "summary": "hughes理解了Puffer/Dolphin的版本更新机制：客户端直接跳到最新Res版本，不同App大版本线互不干扰。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "1bdae1d1-c346-48b4-8d1f-49958171c687",
+    "label": "UE4增量Cook",
+    "type": "tech",
+    "summary": "BP保存失败后被UE4增量Cook永久缓存跳过。\nUE4增量Cook实现了MarkedFailedSaveKept机制，导致保存失败的资产被永久缓存跳过。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "eddc112d-59a7-43ad-adf3-0fdefc5984d0",
+    "label": "MarkedFailedSaveKept机制",
+    "type": "concept",
+    "summary": "UE4增量Cook实现了MarkedFailedSaveKept机制，导致保存失败的资产被永久缓存跳过。\nhughes理解了UE4增量Cook的MarkedFailedSaveKept机制。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  },
+  {
+    "id": "59a48210-c4a8-4858-9ec8-f85875b0b70d",
+    "label": "Redirector",
+    "type": "concept",
+    "summary": "hughes理解了Redirector在Cooked构建中的行为。",
+    "details": {
+      "group_id": "dpar-project"
+    }
+  }
+];
+const edges = [
+  {
+    "id": "fb027caa-5700-4ba5-85fa-0e37eef04404",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "ba8390be-a2e9-4bf1-8290-96b8f7cef617",
+    "relation": "ENHANCED",
+    "fact": "ziyadyao 完成了 SVN 资产引用修复脚本的增强（v3版本）",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "47edcb88-9471-4438-a09f-10024ba60044",
+    "source": "ba8390be-a2e9-4bf1-8290-96b8f7cef617",
+    "target": "2d0d13ff-d072-43d0-ac79-df47c5692d7b",
+    "relation": "ADDED_HANDLING_FOR",
+    "fact": "SVN 资产引用修复脚本 v3 新增了对 MaterialFunction 类型的专门处理逻辑",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9993d976-f032-442f-9271-4969afd0f69b",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "b362729c-a9ff-4605-8ab1-3af0b8ec4104",
+    "relation": "ANALYZED",
+    "fact": "ziyadyao 分析了 dry run 报告中断裂引用的分布情况",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b2efae26-7c15-4f28-ad3c-fe74b61111f3",
+    "source": "b362729c-a9ff-4605-8ab1-3af0b8ec4104",
+    "target": "59b770d2-6eab-4903-8412-0bdaa6d093cc",
+    "relation": "CONTAINS_REFERENCE_TO",
+    "fact": "dry run 报告中包含 607 个 uasset 的断裂引用分布数据",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5066c830-5c7e-45fd-9890-a76ef8f321a5",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "cec10418-7d37-43ca-a4bc-5e62a0f645b1",
+    "relation": "CONFIGURED",
+    "fact": "ziyadyao 配置了 Continue AI 代码助手",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "34b99d92-c3f6-424c-a247-a6611f3fc447",
+    "source": "cec10418-7d37-43ca-a4bc-5e62a0f645b1",
+    "target": "ec551dd4-f1d4-4745-984d-3a6e75c7f71c",
+    "relation": "CONNECTED_TO",
+    "fact": "Continue AI 代码助手对接了第三方代理 API——TIMI AI 平台",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f0a31807-2587-4f6c-ac63-3c86daef3371",
+    "source": "cec10418-7d37-43ca-a4bc-5e62a0f645b1",
+    "target": "072a2125-e846-4046-b519-cb225f1fb267",
+    "relation": "CONNECTED_TO",
+    "fact": "Continue AI 代码助手对接了第三方代理 API——Venus 平台",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1d44af24-eac3-45f4-8a3f-6489ca068dac",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "0391b053-d23b-4dce-9a08-f4e5d24469c8",
+    "relation": "INVESTIGATED_ISSUE_WITH",
+    "fact": "ziyadyao 排查了 UGC 玩法本地 Cook 后无法进入的问题",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d04dc4a7-0dcc-4ba5-9ecc-cc91939d6a26",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "0391b053-d23b-4dce-9a08-f4e5d24469c8",
+    "relation": "ANALYZED",
+    "fact": "hughes分析了UGC地图崩溃问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "c906bca0-a9f4-4729-a13e-9997f4848875",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "ab200b50-f318-4cf8-84a9-4b7693c44b08",
+    "relation": "REVIEWED_HISTORY_OF",
+    "fact": "ziyadyao 回溯了 ClientTools 的开发历史",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0e809b55-9e5f-45ab-9354-2f20a981d794",
+    "source": "ab200b50-f318-4cf8-84a9-4b7693c44b08",
+    "target": "d65edeb3-bb49-4e1c-989d-e134e64f0689",
+    "relation": "CONTAINS",
+    "fact": "ClientTools 包含 OnAnalyzeFolderDependencies 功能",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "94d9b2cf-cdbf-4611-8c15-08761fdd4a50",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "4a00d569-3f4b-4f0d-9432-874e039325fc",
+    "relation": "REVIEWED_DECISIONS_FOR",
+    "fact": "ziyadyao 回溯了 DPAR 离散化方案的关键决策",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "7073502c-d934-4495-a8b4-b9ad5de85a57",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "4a00d569-3f4b-4f0d-9432-874e039325fc",
+    "relation": "CONVERTED",
+    "fact": "hughes完成了DPAR流水线从QuickGenAPP到cookpak模式的转换",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "23672ebb-c220-4f50-8673-b1925b04d569",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "4a00d569-3f4b-4f0d-9432-874e039325fc",
+    "relation": "WORKED_ON",
+    "fact": "hughes在DPAR集成项目中完成了多项关键工作",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4afa5711-325a-4863-8716-913342c624c7",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "4a00d569-3f4b-4f0d-9432-874e039325fc",
+    "relation": "UNDERSTOOD_COMPLETE_BUILD_FLOW_OF",
+    "fact": "hughes深入理解了DPAR项目的完整构建流程。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e1969bb3-e46f-479f-926a-924e9c022526",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "4c4c93d2-2b33-4c83-b113-1b36123435ce",
+    "relation": "REVIEWED_DECISIONS_FOR",
+    "fact": "ziyadyao 回溯了 UGC 离散化方案的关键决策",
+    "valid_at": "2026-03-23 12:16:59.456000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "45837059-a1db-43d2-ae93-e5df3f3987f3",
+    "source": "4a00d569-3f4b-4f0d-9432-874e039325fc",
+    "target": "feafd0ae-5621-4b95-b55a-4da130ee0464",
+    "relation": "CONVERTED_FROM",
+    "fact": "DPAR流水线从QuickGenAPP模式转换为cookpak模式",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1c30ee8e-877e-4c97-a4aa-ca623fce804c",
+    "source": "4a00d569-3f4b-4f0d-9432-874e039325fc",
+    "target": "fee5419c-2956-4492-bd8c-ce372a57a8dc",
+    "relation": "CONVERTED_TO",
+    "fact": "DPAR流水线转换为cookpak模式",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "32218d15-1c08-4a0f-8a52-e670a4e8bf9b",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "4befaf1e-8ec8-4421-a07d-a6647aaac92e",
+    "relation": "FIXED",
+    "fact": "hughes修复了SVN认证和路径不匹配问题",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "65ed4273-211b-4afb-976a-9b711e4a9306",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "8f0c6240-c590-4f9e-b128-07f848e0cd9e",
+    "relation": "IMPLEMENTED",
+    "fact": "hughes实现了DPAR Build Wrapper",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6f69d9a3-174b-47c6-9e89-a5655c2db93f",
+    "source": "8f0c6240-c590-4f9e-b128-07f848e0cd9e",
+    "target": "5877e283-252c-4241-b2c9-6eaa18b96b62",
+    "relation": "HANDLES_ERRORS_FOR",
+    "fact": "dpar_build_wrapper.py通过容错方式处理Blueprint编译错误",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "fae4086b-cc05-44a5-bfe6-0668a51f642a",
+    "source": "02be4e47-c43b-45ca-bfb8-dcd2fa1bd6a7",
+    "target": "5877e283-252c-4241-b2c9-6eaa18b96b62",
+    "relation": "AFFECTS",
+    "fact": "修复NeverCook INI配置的section header问题后，蓝图编译错误显著减少",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5e661142-3f94-493f-a5fb-c65ba5bf40d3",
+    "source": "0391b053-d23b-4dce-9a08-f4e5d24469c8",
+    "target": "5877e283-252c-4241-b2c9-6eaa18b96b62",
+    "relation": "CRASH_RELATED_TO",
+    "fact": "UGC地图崩溃问题与蓝图和C++类迁移兼容性问题有关",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b0771cbc-0411-4460-8f16-16d8fc161dd6",
+    "source": "bef4050f-10b6-4f00-ae84-4dc7fc045adb",
+    "target": "5877e283-252c-4241-b2c9-6eaa18b96b62",
+    "relation": "DEPENDED_ON_BY",
+    "fact": "Blueprint依赖PublicAssets，PublicAssets挂载时序异常导致依赖PublicAssets的BP保存失败。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6f187d58-280e-4f59-94fe-8c8c1ec501ab",
+    "source": "a4c0883c-80aa-4feb-aecc-5ed6bdb9b358",
+    "target": "bef4050f-10b6-4f00-ae84-4dc7fc045adb",
+    "relation": "OVERWRITES",
+    "fact": "Cook过程覆写了PublicAssets源文件",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": "2026-04-03 08:59:01.890000",
+    "episodes": []
+  },
+  {
+    "id": "1767d9dc-1d65-44b3-a0ad-6ba8e6ab545f",
+    "source": "a4c0883c-80aa-4feb-aecc-5ed6bdb9b358",
+    "target": "bef4050f-10b6-4f00-ae84-4dc7fc045adb",
+    "relation": "EXCLUDES_VIA_NEVERCOOK",
+    "fact": "主Cook处理/Game/路径资源，通过NeverCook排除PublicAssets。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4ce20749-e1c8-406f-80e3-f57fcc06ff41",
+    "source": "38a5bdf5-4613-4cc2-b3e2-320e357e2957",
+    "target": "bef4050f-10b6-4f00-ae84-4dc7fc045adb",
+    "relation": "PROCESSES",
+    "fact": "DPAR Cook单独处理PublicAssets。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "22b17517-add4-42d3-8fdb-7db2e11371ab",
+    "source": "a4c0883c-80aa-4feb-aecc-5ed6bdb9b358",
+    "target": "80a082db-0cda-4f4d-b75f-07cb9be50bd7",
+    "relation": "CAUSED_ERROR_IN",
+    "fact": "Cook过程覆写PublicAssets源文件导致HotShaderDivide报'Package is too old'错误",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "467545a5-ed37-4c86-b465-ef6c15e685a0",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "0f9f3787-c157-44b3-9a44-b7a3c12e5b1d",
+    "relation": "FIXED_STARTUP_ISSUE",
+    "fact": "hughes修复了APK启动卡顿的热更新问题",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "610e5bbc-4a9a-4e86-838f-cdb180a18882",
+    "source": "062c2597-d5fa-4823-b0a6-b5368466183b",
+    "target": "0f9f3787-c157-44b3-9a44-b7a3c12e5b1d",
+    "relation": "INCLUDED_IN",
+    "fact": "p_base_1被确保打入APK以修复热更新问题",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "c67eed05-c7bd-4a8f-8874-96ef2e1530bc",
+    "source": "277ce881-7304-4ff1-93a1-bf9f33444c5c",
+    "target": "0f9f3787-c157-44b3-9a44-b7a3c12e5b1d",
+    "relation": "INCLUDED_IN",
+    "fact": "p_base_2被确保打入APK以修复热更新问题",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9624b5e3-624e-4a25-96fe-063ee06b2788",
+    "source": "69ebd5d3-d9c3-41f2-9749-e26228d53b1b",
+    "target": "0f9f3787-c157-44b3-9a44-b7a3c12e5b1d",
+    "relation": "INCLUDED_IN",
+    "fact": "p_base_3被确保打入APK以修复热更新问题",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "16db21dc-c7ac-499a-822e-a621c17b9670",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "0f9f3787-c157-44b3-9a44-b7a3c12e5b1d",
+    "relation": "FIXED_LOADING_ISSUE",
+    "fact": "hughes解决了APK资产加载失败问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "afd5f535-84f4-4ab7-8397-69d9eb64fbd4",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "02be4e47-c43b-45ca-bfb8-dcd2fa1bd6a7",
+    "relation": "FIXED",
+    "fact": "hughes修复了NeverCook INI配置的section header问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1bdaeb39-3def-4895-bbae-32e1c66a99b1",
+    "source": "02be4e47-c43b-45ca-bfb8-dcd2fa1bd6a7",
+    "target": "6152b7f7-632a-4dfe-b59c-b9419f422f2a",
+    "relation": "INTERCEPTED_BY",
+    "fact": "DirectoriesToNeverCook被Build.py的ConfigSettingBlacklist拦截",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "49afd9a4-7ae7-44c8-81e1-f0dd15a69100",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "6152b7f7-632a-4dfe-b59c-b9419f422f2a",
+    "relation": "REFACTORED",
+    "fact": "hughes重构了Build.py中资产扫描和批量Cook过程，解决命令行参数超长限制",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "21894dd2-56dc-474b-b655-ebcd798df274",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "6152b7f7-632a-4dfe-b59c-b9419f422f2a",
+    "relation": "IMPLEMENTED",
+    "fact": "hughes在Build.py中实现了UFS路径保存恢复逻辑",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "40d29b08-7731-4b49-b8d9-2978d37cdbbb",
+    "source": "02be4e47-c43b-45ca-bfb8-dcd2fa1bd6a7",
+    "target": "a006ba8f-30e9-4023-91e5-39b9964cfa33",
+    "relation": "BLOCKED_BY",
+    "fact": "DirectoriesToNeverCook被ConfigSettingBlacklist拦截屏蔽",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "93965ca1-3f8e-4c42-874f-adfc3e6f9f11",
+    "source": "6152b7f7-632a-4dfe-b59c-b9419f422f2a",
+    "target": "a006ba8f-30e9-4023-91e5-39b9964cfa33",
+    "relation": "CONTAINS",
+    "fact": "Build.py包含ConfigSettingBlacklist机制用于拦截某些配置项",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0ba7b2f8-5d1c-4470-aeb1-3ce0f226722a",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "4e05b38e-2340-4323-838f-047d8e6a569d",
+    "relation": "STUDIED_BEHAVIOR_OF",
+    "fact": "hughes深入理解了UE4硬引用与软引用在Cook中的行为差异",
+    "valid_at": "2026-03-25 07:08:57.222000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "91ce0bf2-8a8f-4225-bb95-39dc13f5723b",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "92455a6f-3918-4532-a232-607e72e7bf59",
+    "relation": "WORKED_ON",
+    "fact": "ziyadyao 在资产迁移领域进行了大量工作",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "07edc9da-aa7f-4d28-87e8-dfeddb0d4e7a",
+    "source": "abd5cce9-468f-403a-a8f5-3f59264ed5fe",
+    "target": "0828182d-4279-4c02-a5f6-3f83bf8ba2a4",
+    "relation": "BUILT_WITH",
+    "fact": "依赖校验脚本使用 Unreal Python 开发",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "185ecf79-73c3-4277-9293-9136ee9ec7de",
+    "source": "dc82b759-9af5-4954-b41e-5b584998900e",
+    "target": "0828182d-4279-4c02-a5f6-3f83bf8ba2a4",
+    "relation": "BUILT_WITH",
+    "fact": "抽查脚本使用 Unreal Python 开发",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d1360d17-0b5f-4272-9cac-e35d2d16e63c",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "abd5cce9-468f-403a-a8f5-3f59264ed5fe",
+    "relation": "DEVELOPED",
+    "fact": "ziyadyao 使用 Unreal Python 开发了依赖校验脚本",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "81dfca57-ff85-4b45-ba5e-927aa6ab07da",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "dc82b759-9af5-4954-b41e-5b584998900e",
+    "relation": "DEVELOPED",
+    "fact": "ziyadyao 使用 Unreal Python 开发了抽查脚本",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "923d99ef-9952-4a3f-b401-ee326c4c283a",
+    "source": "abd5cce9-468f-403a-a8f5-3f59264ed5fe",
+    "target": "58816a80-1543-487c-92e8-f6311c797c16",
+    "relation": "VALIDATES",
+    "fact": "依赖校验脚本用于验证公共资产的完整性",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b914d266-71a9-45eb-954d-456bea632bf2",
+    "source": "dc82b759-9af5-4954-b41e-5b584998900e",
+    "target": "58816a80-1543-487c-92e8-f6311c797c16",
+    "relation": "VALIDATES",
+    "fact": "抽查脚本用于验证公共资产的完整性",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d94cbf3b-2411-4c96-b89c-ec537922a86c",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "4ccdb593-8f4f-4141-a5cb-2cbcd72fa576",
+    "relation": "SUBMITTED_TO",
+    "fact": "ziyadyao 完成了 607 个迁移资产及其依赖路径修复的 SVN 提交",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "dd4ddeae-b498-4f5a-8404-53f36b2bc78d",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "4ccdb593-8f4f-4141-a5cb-2cbcd72fa576",
+    "relation": "CONFIGURED",
+    "fact": "hughes配置了SVN的SYSTEM账户认证",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "c5489db4-3560-418c-beb7-3c89c7d647fe",
+    "source": "be0f0b02-ea34-41c2-b62a-30775eaba96c",
+    "target": "4ccdb593-8f4f-4141-a5cb-2cbcd72fa576",
+    "relation": "CONTAINS_STALE_ENTRIES_NOT_IN",
+    "fact": "CSV中存在已不再SVN中的残留测试条目需要清理",
+    "valid_at": "2026-04-02 13:26:09.082000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9923e01b-6ac5-45f5-9a70-d1a3e19214c3",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "a1a5271a-1366-4938-bb35-77b8cc97b67e",
+    "relation": "MODIFIED",
+    "fact": "ziyadyao 调整了 Git 忽略规则以支持项目配置文件的版本控制",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "fc2fb12b-9de0-4a49-b330-522b769c85c2",
+    "source": "a1a5271a-1366-4938-bb35-77b8cc97b67e",
+    "target": "04eef8b8-e2f7-4442-bf44-abab37c3ff42",
+    "relation": "VERSION_CONTROLS",
+    "fact": "调整 Git 忽略规则后，Git 支持对项目配置文件进行版本控制",
+    "valid_at": "2026-03-26 14:35:38.706000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "fd97eb28-8656-4ec4-84a1-6cbdaf6e7a6d",
+    "source": "4ccdb593-8f4f-4141-a5cb-2cbcd72fa576",
+    "target": "f171646c-550d-4bcd-a0f2-b660509ba0d9",
+    "relation": "AUTHENTICATED_WITH",
+    "fact": "SVN配置了SYSTEM账户认证",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5734e5c3-cde8-4524-b644-75202f90dbcb",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "89f09dca-d206-4119-b304-968e5c01f36e",
+    "relation": "FIXED",
+    "fact": "hughes修复了PsExec配置和用户名格式问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b3be3725-c428-40b0-afdb-6a4e4590ea3a",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "56ee6fd2-3086-49e9-8393-f7a69bfbe317",
+    "relation": "FIXED",
+    "fact": "hughes修复了multiprocessing包装器兼容性问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "bbb6b30d-3f8d-4c96-9935-58e5122a1bd8",
+    "source": "56ee6fd2-3086-49e9-8393-f7a69bfbe317",
+    "target": "ead9ba19-a47e-4c68-a3b2-3ae8103c101c",
+    "relation": "ENABLES",
+    "fact": "修复multiprocessing包装器兼容性问题后，流水线在PakChunkNew阶段正常执行",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "88718e30-a699-453d-85da-42da3a23e985",
+    "source": "0f9f3787-c157-44b3-9a44-b7a3c12e5b1d",
+    "target": "a066124a-c5f8-42a5-b9a8-6c418f3eeefa",
+    "relation": "DEPENDS_ON",
+    "fact": "APK资产加载失败的原因之一是DefaultGame.ini中公共资产配置缺失",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8025f6b4-66e6-4165-8768-254cd651cd37",
+    "source": "0f9f3787-c157-44b3-9a44-b7a3c12e5b1d",
+    "target": "1657482b-5fa8-41c1-809b-35364a6410ee",
+    "relation": "DEPENDS_ON",
+    "fact": "APK资产加载失败的原因之一是SDK初始化问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "bcd8310e-b6d9-4f04-b59a-8a5d6b9be829",
+    "source": "8f0c6240-c590-4f9e-b128-07f848e0cd9e",
+    "target": "09119984-a62b-4d35-be38-a781bf070636",
+    "relation": "FIXES",
+    "fact": "DPAR Build Wrapper修复了DPAR_COOKED_CHECK_DIR硬编码路径问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "768d5cce-9205-48a8-9ffd-3da3929f97cc",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "24049021-dbe2-4031-95cc-b41f13976b06",
+    "relation": "FIXED",
+    "fact": "hughes修复了fork_pipeline.yaml中COOK_EXIT变量处理问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "af24ca38-20d3-4932-9a4a-5e84c0d9a25b",
+    "source": "24049021-dbe2-4031-95cc-b41f13976b06",
+    "target": "6c2268ec-9943-41c4-bcc1-f4fbdd577eb8",
+    "relation": "CONTAINS",
+    "fact": "fork_pipeline.yaml中存在COOK_EXIT变量处理问题，已被修复",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5cb2db9b-c5df-4147-9cf8-6e7c924befdf",
+    "source": "6152b7f7-632a-4dfe-b59c-b9419f422f2a",
+    "target": "dd08489c-31e0-4b87-a06a-484b9eafc856",
+    "relation": "MANAGES",
+    "fact": "Build.py中实现了UFS路径保存恢复逻辑",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f78a43cb-e682-4998-8c6e-3ae9773b5229",
+    "source": "dd08489c-31e0-4b87-a06a-484b9eafc856",
+    "target": "d4ca891e-080a-48b4-831a-ee660e3b5d93",
+    "relation": "AFFECTS",
+    "fact": "Build.py中UFS路径保存恢复逻辑解决了Lua脚本加载问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "dd5b572d-9310-48ec-bdf2-d4756f24c6f0",
+    "source": "23dd07fb-8f74-4620-b17d-49af39c462e5",
+    "target": "d4ca891e-080a-48b4-831a-ee660e3b5d93",
+    "relation": "USES",
+    "fact": "坦克战存在Lua角色挂载问题需要调试排查",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "afd21e3b-f51f-42ce-9166-61329bff356c",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "be0f0b02-ea34-41c2-b62a-30775eaba96c",
+    "relation": "FIXED",
+    "fact": "hughes修复了CSV文件问题，并优化了Pak阶段文件检索逻辑",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e43bf18d-2825-45de-ae38-6d414f6d5f52",
+    "source": "be0f0b02-ea34-41c2-b62a-30775eaba96c",
+    "target": "8375b225-260c-458b-8fc9-170863e722a9",
+    "relation": "RELATED_TO",
+    "fact": "修复CSV文件问题和白名单配置问题，解决了feature pak缺失的情况",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a5aaf712-1b15-4aaf-93fb-95bdb29d1b2a",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "8375b225-260c-458b-8fc9-170863e722a9",
+    "relation": "FIXED_MISSING_ISSUE",
+    "fact": "hughes修复了白名单配置导致的feature pak缺失问题",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "35f108c7-60c1-48b1-b8ed-f21e5936ea1f",
+    "source": "0391b053-d23b-4dce-9a08-f4e5d24469c8",
+    "target": "0c17abc3-d703-4ac1-b274-20e09b68b1d1",
+    "relation": "CRASH_RELATED_TO",
+    "fact": "UGC地图崩溃问题与蓝图和C++类迁移兼容性问题有关",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3a13ab79-ccd5-4014-a081-045c743e0b8d",
+    "source": "5877e283-252c-4241-b2c9-6eaa18b96b62",
+    "target": "0c17abc3-d703-4ac1-b274-20e09b68b1d1",
+    "relation": "MIGRATION_COMPATIBILITY_ISSUE",
+    "fact": "蓝图与C++类之间存在迁移兼容性问题，导致UGC地图崩溃",
+    "valid_at": "2026-03-27 07:54:58.672000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b956ed74-624b-4423-843d-835b656a3681",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "f0aeb0cb-ba58-42ee-a984-689969b8b4cb",
+    "relation": "WORKED_IN",
+    "fact": "ziyadyao在Unreal编辑器中进行了大量关卡场景搭建与调整工作",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8807fbbc-efee-41ac-8e37-a9d9cd599dc0",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "0d357266-a22a-444d-b3cd-545ecbe08d45",
+    "relation": "GENERATED_AND_ARRANGED",
+    "fact": "ziyadyao对竞技场墙体进行了批量生成与布局优化",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "58bff35d-1bba-46bc-9271-9d6d24368cf8",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "9fa6bcf9-47e5-4b3c-951c-34212f04de8c",
+    "relation": "GENERATED_AND_ARRANGED",
+    "fact": "ziyadyao对地面进行了批量生成与布局优化",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "929bd7b3-2979-43cd-bc4b-ff3b91c49bce",
+    "source": "c939b4f9-bb8d-4c7b-ba2f-b7f55b06c6b1",
+    "target": "9fa6bcf9-47e5-4b3c-951c-34212f04de8c",
+    "relation": "CONFIGURES",
+    "fact": "map.json配置用于驱动地图生成，涉及地面的缩放和贴地问题排查",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "10e55e9b-ca81-497f-ba77-c097cb04099b",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "2f9a5661-6e73-450e-99fa-2b38be7506f2",
+    "relation": "GENERATED_AND_ARRANGED",
+    "fact": "ziyadyao对障碍物进行了批量生成与布局优化",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "85755545-76e0-411e-b428-6bc5e7b10a1e",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "b3fdb8b5-52c9-4787-b5e3-6f48b8bf2535",
+    "relation": "GENERATED_AND_ARRANGED",
+    "fact": "ziyadyao对敌方坦克进行了批量生成与布局优化",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "2697fd1f-0e9f-45e7-8fbd-f3be60596abb",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "c939b4f9-bb8d-4c7b-ba2f-b7f55b06c6b1",
+    "relation": "USED_FOR_MAP_GENERATION",
+    "fact": "ziyadyao尝试通过map.json配置驱动地图生成，并排查缩放和贴地问题",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d56efc08-861e-442f-a664-b0ca8f2d8e5d",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "51424555-cb07-4cfd-94de-e8d6001f8f22",
+    "relation": "DEBUGGED",
+    "fact": "ziyadyao对_MO加载异常问题进行了持续调试排查",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "81f11160-ace0-4d2d-9b9b-86c404cb49e2",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "23dd07fb-8f74-4620-b17d-49af39c462e5",
+    "relation": "DEBUGGED",
+    "fact": "ziyadyao对坦克战Lua/UnLua角色挂载问题进行了持续调试排查",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "fc0f5589-aa01-4159-8409-aebe676e6256",
+    "source": "23dd07fb-8f74-4620-b17d-49af39c462e5",
+    "target": "6276f9c2-293f-44b0-8b9a-46aa9433b052",
+    "relation": "USES",
+    "fact": "坦克战存在UnLua角色挂载问题需要调试排查",
+    "valid_at": "2026-03-28 18:48:50.525000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "10929ba2-ffb1-4ee7-aaf3-0b9c1a205a9f",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "420e27ee-0597-4af8-bfc4-520816831888",
+    "relation": "COMPARED",
+    "fact": "ziyadyao对比了流水线YAML构建逻辑与本地已跑通的构建脚本",
+    "valid_at": "2026-04-02 13:07:08.408000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "07726243-2ad9-46b8-bb16-8101d3a3ff2c",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "09bf8fbc-e43b-4f3a-877d-d09c98129024",
+    "relation": "COMPARED",
+    "fact": "ziyadyao对比了流水线YAML构建逻辑与本地已跑通的构建脚本",
+    "valid_at": "2026-04-02 13:07:08.408000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a4b35951-54a6-47ee-b4e0-c77ac056f9cc",
+    "source": "4a00d569-3f4b-4f0d-9432-874e039325fc",
+    "target": "cc9cee3a-63d4-44c4-a9cf-b10054fa03b2",
+    "relation": "IS_IMPLEMENTED_AS",
+    "fact": "现有流水线DPAR更像内联脚本硬编码方案",
+    "valid_at": "2026-04-02 13:07:08.408000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f83f1618-86d3-4664-bfb0-1c884d9cb64a",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "7b92467c-b271-4969-ab68-5ce476828fe5",
+    "relation": "DETERMINED_OPTIMIZATION_DIRECTION",
+    "fact": "ziyadyao确定了用本地Python化流程替换现有DPAR内联脚本硬编码方案的优化方向",
+    "valid_at": "2026-04-02 13:07:08.408000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "75423103-100a-4ee2-85ae-9e1934329fe0",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "117652e7-d415-4039-b63f-b54c585bea54",
+    "relation": "INVESTIGATED",
+    "fact": "ziyadyao排查了Android与WindowsClient构建路径差异",
+    "valid_at": "2026-04-02 13:07:08.408000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "24054aaa-c228-414e-8e7b-13ce4d829a18",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "e18c81de-bca1-4fb9-b238-f3d0cb06cf35",
+    "relation": "INVESTIGATED",
+    "fact": "ziyadyao排查了Android与WindowsClient构建路径差异",
+    "valid_at": "2026-04-02 13:07:08.408000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "71cb075e-fb58-42c8-be63-4a2a7e580503",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "a1938fa2-1883-4e7f-ae6b-fc3b5fc47e18",
+    "relation": "REFACTORED_AND_FIXED",
+    "fact": "ziyadyao完成了Android出包流程重构与修复提交",
+    "valid_at": "2026-04-02 13:07:08.408000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6ff0c77c-44c4-4eeb-8213-d712e08ab77f",
+    "source": "a1938fa2-1883-4e7f-ae6b-fc3b5fc47e18",
+    "target": "8c382dab-0d0b-48e6-ae09-85a137978397",
+    "relation": "CONVERGED_CORE_LOGIC_TO",
+    "fact": "Android出包流程重构将核心打包逻辑收敛到Python脚本中以提高可维护性",
+    "valid_at": "2026-04-02 13:07:08.408000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9a1f0560-551c-4303-8a4a-ee929055ec7b",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "749322ec-fa31-4898-b34b-9fc917165023",
+    "relation": "INVESTIGATED",
+    "fact": "ziyadyao排查了DPAR打包流程中资产未被打进pak的问题",
+    "valid_at": "2026-04-02 13:26:09.082000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "933800f6-b516-4491-bb2f-4928d3c50afa",
+    "source": "1d7ed0dc-254e-478a-9ef9-9e987a3b3e91",
+    "target": "d3a5b981-caca-44fb-b785-7bb2c42e0dce",
+    "relation": "RESULTS_IN_MISSING_ASSETS_IN",
+    "fact": "DPAR配置内容异常偏空，导致目标PS资产没有成功进入pak的证据",
+    "valid_at": "2026-04-02 13:26:09.082000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5e07af9f-095b-4d37-a193-4064cb3752ec",
+    "source": "5f117c0f-73ad-4784-84ee-9e873a0bc9aa",
+    "target": "d3a5b981-caca-44fb-b785-7bb2c42e0dce",
+    "relation": "NOT_FOUND_IN",
+    "fact": "相关日志和产物中没有目标PS资产成功进入pak的证据",
+    "valid_at": "2026-04-02 13:26:09.082000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6a9869c2-9a40-4aea-8678-e403f48a7b4c",
+    "source": "4a3bf890-c70b-40fe-83f4-b38270ad6e56",
+    "target": "1d7ed0dc-254e-478a-9ef9-9e987a3b3e91",
+    "relation": "NEEDS_VERIFICATION_VIA",
+    "fact": "部分目标资源的chunk/打包状态需要通过配置与产物一致性来确认",
+    "valid_at": "2026-04-02 13:26:09.082000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "2a8d25a0-d1c4-4a5f-a5ff-e08ee32ed076",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "605758b7-e101-416d-b143-40ec8c80bddd",
+    "relation": "RESEARCHED",
+    "fact": "ziyadyao调研了skill提示词机制",
+    "valid_at": "2026-04-02 13:26:09.082000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f2e35a18-714d-4ef0-8d68-6b5c6956ab03",
+    "source": "cc36ea74-4bd7-4f62-9a19-fbd2998a6b78",
+    "target": "ab43ded6-99d3-4ad8-b4ac-6182585b5177",
+    "relation": "RESEARCHED",
+    "fact": "ziyadyao调研了Claude Code的开源许可证性质",
+    "valid_at": "2026-04-02 13:26:09.082000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "488240de-8174-4170-a3c3-2c5ed701537d",
+    "source": "ab43ded6-99d3-4ad8-b4ac-6182585b5177",
+    "target": "95035530-f9a3-4efb-89b2-7115b5f83723",
+    "relation": "HAS_LICENSE_TYPE",
+    "fact": "ziyadyao调研了Claude Code的开源许可证性质",
+    "valid_at": "2026-04-02 13:26:09.082000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5b019b34-22a2-4cbf-a132-b7e8993c67fc",
+    "source": "38a5bdf5-4613-4cc2-b3e2-320e357e2957",
+    "target": "04f62fef-222c-4f29-a7db-5b577e616d0b",
+    "relation": "PRODUCES",
+    "fact": "DPAR Cook将PublicAssets打成dpar_*.pak。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "85f34a86-15d2-4eb8-a5e8-f423559c99eb",
+    "source": "04f62fef-222c-4f29-a7db-5b577e616d0b",
+    "target": "4bda7528-9b64-48a8-a7a2-82e4b15eef51",
+    "relation": "DISTRIBUTED_VIA",
+    "fact": "dpar_*.pak通过Puffer进行分发。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a5a2c638-b9ac-4af5-99be-7fc0e99a9fb7",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "be80947c-f3b7-4e1e-9700-410ffaa61391",
+    "relation": "DELETED_TO_CLEAR_CACHE",
+    "fact": "hughes通过删除DevelopmentAssetRegistry.bin清除了BP保存失败的增量Cook缓存。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9f6f404c-4d90-47bf-8c6f-a95bdf308b27",
+    "source": "4bda7528-9b64-48a8-a7a2-82e4b15eef51",
+    "target": "40fa83c8-cb1b-48c5-95af-753009aabfbd",
+    "relation": "RELATED_VERSION_UPDATE_MECHANISM",
+    "fact": "hughes理解了Puffer/Dolphin的版本更新机制：客户端直接跳到最新Res版本，不同App大版本线互不干扰。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "92d1b8b4-2d5a-4102-b917-20e26317ca01",
+    "source": "5877e283-252c-4241-b2c9-6eaa18b96b62",
+    "target": "1bdae1d1-c346-48b4-8d1f-49958171c687",
+    "relation": "CACHED_AS_FAILED_BY",
+    "fact": "BP保存失败后被UE4增量Cook永久缓存跳过。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "96d32c73-2fa4-4160-a03d-e0faef6b2add",
+    "source": "1bdae1d1-c346-48b4-8d1f-49958171c687",
+    "target": "eddc112d-59a7-43ad-adf3-0fdefc5984d0",
+    "relation": "IMPLEMENTS",
+    "fact": "UE4增量Cook实现了MarkedFailedSaveKept机制，导致保存失败的资产被永久缓存跳过。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "cd280308-f1f2-4977-8dc0-b9613f51721c",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "eddc112d-59a7-43ad-adf3-0fdefc5984d0",
+    "relation": "UNDERSTOOD",
+    "fact": "hughes理解了UE4增量Cook的MarkedFailedSaveKept机制。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a3c26b10-5f8f-45e1-bf0f-cdb0e2209540",
+    "source": "c709c6c3-6336-4ba4-a26d-7794073c784a",
+    "target": "59a48210-c4a8-4858-9ec8-f85875b0b70d",
+    "relation": "UNDERSTOOD_BEHAVIOR_OF",
+    "fact": "hughes理解了Redirector在Cooked构建中的行为。",
+    "valid_at": "2026-04-03 08:59:01.890000",
+    "invalid_at": null,
+    "episodes": []
+  }
+];
+document.getElementById("node-count").textContent = nodes.length;
+document.getElementById("edge-count").textContent = edges.length;
+
+const colorMap = {"person": "#64e4ff", "tech": "#3a7bff", "document": "#6e5cff", "concept": "#ff8c42", "issue": "#ff4a6b"};
+const typeLabel = {"person": "人物", "tech": "技术 / 工具", "document": "文档 / 文件", "concept": "概念 / 方案", "issue": "问题 / Bug"};
+
+function nodeRadius(d) {
+  const lc = edges.filter(e => e.source === d.id || e.target === d.id
+    || (e.source.id||e.source) === d.id || (e.target.id||e.target) === d.id).length;
+  return Math.max(18, 12 + lc * 3);
+}
+
+const svg = d3.select("#graph-svg");
+const container = svg.append("g");
+svg.call(d3.zoom().scaleExtent([0.2,4]).on("zoom", e => container.attr("transform", e.transform)));
+const width = window.innerWidth - 400, height = window.innerHeight;
+
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(edges).id(d => d.id).distance(140))
+  .force("charge", d3.forceManyBody().strength(-400))
+  .force("center", d3.forceCenter(width/2, height/2))
+  .force("collision", d3.forceCollide().radius(d => nodeRadius(d)+16));
+
+(function computeCurvatures() {
+  const pc = {}, pi = {};
+  edges.forEach(e => {
+    const k = [e.source.id||e.source, e.target.id||e.target].sort().join("||");
+    pc[k] = (pc[k]||0)+1; pi[k] = 0;
+  });
+  edges.forEach(e => {
+    const k = [e.source.id||e.source, e.target.id||e.target].sort().join("||");
+    const t = pc[k], i = pi[k]++;
+    e._curve = t===1 ? 0 : (i-(t-1)/2)*45;
+  });
+})();
+
+const linkGroup = container.append("g");
+const linkPaths = linkGroup.selectAll("path").data(edges).join("path")
+  .attr("fill","none").attr("stroke",d=>d.invalid_at?"#0c1628":"#142240")
+  .attr("stroke-width",d=>d.invalid_at?1:1.5).attr("stroke-dasharray",d=>d.invalid_at?"6 4":"none")
+  .attr("marker-end","url(#arrow)").attr("cursor","pointer")
+  .on("click",(ev,d)=>{ev.stopPropagation();showEdgeDetail(d)})
+  .on("mouseenter",(ev,d)=>highlightEdge(d,true)).on("mouseleave",(ev,d)=>highlightEdge(d,false));
+
+const linkLabels = linkGroup.selectAll("text").data(edges).join("text")
+  .text(d=>d.relation).attr("font-size",8).attr("font-family","'Share Tech Mono',monospace")
+  .attr("fill",d=>d.invalid_at?"#0e1830":"#2a4068").attr("text-anchor","middle").attr("dy",-8)
+  .attr("cursor","pointer").attr("letter-spacing","1px")
+  .on("click",(ev,d)=>{ev.stopPropagation();showEdgeDetail(d)});
+
+const nodeGroup = container.append("g");
+const nodeEls = nodeGroup.selectAll("g").data(nodes).join("g").attr("cursor","grab")
+  .call(d3.drag()
+    .on("start",(ev,d)=>{if(!ev.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y})
+    .on("drag",(ev,d)=>{d.fx=ev.x;d.fy=ev.y})
+    .on("end",(ev,d)=>{if(!ev.active)simulation.alphaTarget(0);d.fx=null;d.fy=null}));
+
+nodeEls.append("circle").attr("r",d=>nodeRadius(d)+8).attr("fill","none")
+  .attr("stroke",d=>colorMap[d.type]||"#888").attr("stroke-width",0.5).attr("stroke-opacity",0.12).attr("stroke-dasharray","4 3");
+nodeEls.append("circle").attr("class","node-main").attr("r",d=>nodeRadius(d))
+  .attr("fill",d=>colorMap[d.type]||"#888").attr("fill-opacity",0.06)
+  .attr("stroke",d=>colorMap[d.type]||"#888").attr("stroke-width",1.5).attr("stroke-opacity",0.7).attr("filter","url(#glow)");
+nodeEls.append("circle").attr("r",d=>nodeRadius(d)*0.22)
+  .attr("fill",d=>colorMap[d.type]||"#888").attr("fill-opacity",0.6).attr("filter","url(#glow)");
+nodeEls.append("text").text(d=>d.label).attr("text-anchor","middle").attr("dy",d=>nodeRadius(d)+20)
+  .attr("fill","#4a6890").attr("font-size",10).attr("font-weight",500)
+  .attr("font-family","'Exo 2','Noto Sans SC',sans-serif").attr("letter-spacing","0.5px");
+
+nodeEls.on("click",(ev,d)=>{ev.stopPropagation();showNodeDetail(d)})
+  .on("mouseenter",(ev,d)=>highlightNode(d,true)).on("mouseleave",(ev,d)=>highlightNode(d,false));
+
+simulation.on("tick",()=>{
+  linkPaths.attr("d",d=>{
+    const dx=d.target.x-d.source.x,dy=d.target.y-d.source.y;
+    if(d._curve===0)return`M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
+    const mx=(d.source.x+d.target.x)/2,my=(d.source.y+d.target.y)/2,len=Math.sqrt(dx*dx+dy*dy)||1;
+    return`M${d.source.x},${d.source.y} Q${mx+(-dy/len*d._curve)},${my+(dx/len*d._curve)} ${d.target.x},${d.target.y}`;
+  });
+  linkLabels.attr("x",d=>{const mx=(d.source.x+d.target.x)/2;if(d._curve===0)return mx;const dx=d.target.x-d.source.x,dy=d.target.y-d.source.y,len=Math.sqrt(dx*dx+dy*dy)||1;return mx+(-dy/len*d._curve)*0.5})
+    .attr("y",d=>{const my=(d.source.y+d.target.y)/2;if(d._curve===0)return my;const dx=d.target.x-d.source.x,dy=d.target.y-d.source.y,len=Math.sqrt(dx*dx+dy*dy)||1;return my+(dx/len*d._curve)*0.5});
+  nodeEls.attr("transform",d=>`translate(${d.x},${d.y})`);
+});
+
+function highlightNode(d,on){
+  const ce=new Set(),cn=new Set([d.id]);
+  edges.forEach(e=>{const s=e.source.id||e.source,t=e.target.id||e.target;if(s===d.id||t===d.id){ce.add(e.id);cn.add(s);cn.add(t)}});
+  if(on){
+    nodeEls.select(".node-main").transition().duration(200).attr("fill-opacity",n=>cn.has(n.id)?0.15:0.015).attr("stroke-opacity",n=>cn.has(n.id)?1:0.06).attr("filter",n=>cn.has(n.id)?"url(#glow-strong)":"none");
+    nodeEls.select("text").transition().duration(200).attr("fill-opacity",n=>cn.has(n.id)?1:0.1).attr("fill",n=>n.id===d.id?"#fff":(cn.has(n.id)?"#6890b8":"#4a6890"));
+    linkPaths.transition().duration(200).attr("stroke",e=>ce.has(e.id)?"#00c8ff":"#060e1a").attr("stroke-opacity",e=>ce.has(e.id)?0.9:0.06).attr("stroke-width",e=>ce.has(e.id)?2.5:1).attr("marker-end",e=>ce.has(e.id)?"url(#arrow-highlight)":"url(#arrow)");
+    linkLabels.transition().duration(200).attr("fill-opacity",e=>ce.has(e.id)?1:0.03);
+  }else{
+    nodeEls.select(".node-main").transition().duration(300).attr("fill-opacity",0.06).attr("stroke-opacity",0.7).attr("filter","url(#glow)");
+    nodeEls.select("text").transition().duration(300).attr("fill-opacity",1).attr("fill","#4a6890");
+    linkPaths.transition().duration(300).attr("stroke",e=>e.invalid_at?"#0c1628":"#142240").attr("stroke-opacity",1).attr("stroke-width",e=>e.invalid_at?1:1.5).attr("marker-end","url(#arrow)");
+    linkLabels.transition().duration(300).attr("fill-opacity",1);
+  }
+}
+function highlightEdge(e,on){
+  if(on){linkPaths.transition().duration(150).attr("stroke",l=>l.id===e.id?"#00c8ff":"#060e1a").attr("stroke-opacity",l=>l.id===e.id?1:0.1).attr("stroke-width",l=>l.id===e.id?3:1);linkLabels.transition().duration(150).attr("fill-opacity",l=>l.id===e.id?1:0.06).attr("fill",l=>l.id===e.id?"#64e4ff":"#2a4068")}
+  else{linkPaths.transition().duration(250).attr("stroke",l=>l.invalid_at?"#0c1628":"#142240").attr("stroke-opacity",1).attr("stroke-width",l=>l.invalid_at?1:1.5);linkLabels.transition().duration(250).attr("fill-opacity",1).attr("fill",l=>l.invalid_at?"#0e1830":"#2a4068")}
+}
+
+const panel=d3.select("#detail-panel"),panelContent=d3.select("#panel-content");
+d3.select("#close-panel").on("click",()=>panel.classed("hidden",true));
+svg.on("click",()=>panel.classed("hidden",true));
+
+function showNodeDetail(d){
+  const c=colorMap[d.type]||"#888";
+  const re=edges.filter(e=>(e.source.id||e.source)===d.id||(e.target.id||e.target)===d.id);
+  let h=`<h2>${d.label}</h2><span class="type-badge" style="background:${c}18;color:${c};border:1px solid ${c}35">${typeLabel[d.type]||d.type}</span>`;
+  h+=`<div class="section-title">摘要 Summary</div><div class="fact-text" style="border-left-color:${c}">${d.summary||'暂无摘要'}</div>`;
+  if(d.details){h+=`<div class="section-title">属性 Properties</div>`;Object.entries(d.details).forEach(([k,v])=>{h+=`<div class="meta-row"><span class="label">${k}</span><span class="value">${v}</span></div>`})}
+  h+=`<div class="section-title">关联事实边 (${re.length})</div>`;
+  re.forEach(e=>{const s=e.source.id||e.source,t=e.target.id||e.target,dir=s===d.id?`→ ${t}`:`← ${s}`;h+=`<div class="edge-list-item" data-edge-id="${e.id}"><span class="rel">${e.relation}</span><span class="target">${dir}</span><div style="margin-top:6px;color:#3a5078;font-size:12px;line-height:1.6">${e.fact}</div></div>`});
+  panelContent.html(h);panel.classed("hidden",false);
+  panelContent.selectAll(".edge-list-item").on("click",function(){const edge=edges.find(e=>e.id===this.getAttribute("data-edge-id"));if(edge)showEdgeDetail(edge)});
+}
+function showEdgeDetail(e){
+  const s=e.source.id||e.source,t=e.target.id||e.target;
+  let h=`<h2 style="font-size:16px;color:#64e4ff">${s} → ${t}</h2><span class="type-badge" style="background:#00c8ff18;color:#64e4ff;border:1px solid #00c8ff35">${e.relation}</span>`;
+  if(e.invalid_at)h+=`<span class="type-badge" style="background:#ff4a4a12;color:#ff6b6b;border:1px solid #ff4a4a30;margin-left:6px">已失效</span>`;
+  h+=`<div class="section-title">事实 Fact</div><div class="fact-text">${e.fact}</div>`;
+  h+=`<div class="section-title">时间信息</div><div class="meta-row"><span class="label">valid_at</span><span class="value">${e.valid_at||'—'}</span></div><div class="meta-row"><span class="label">invalid_at</span><span class="value">${e.invalid_at||'<span style="color:#00c8ff">null (仍有效)</span>'}</span></div>`;
+  h+=`<div class="section-title">关联节点</div><div class="edge-list-item" data-node-id="${s}"><span class="rel">Source</span><span class="target">${s}</span></div><div class="edge-list-item" data-node-id="${t}"><span class="rel">Target</span><span class="target">${t}</span></div>`;
+  panelContent.html(h);panel.classed("hidden",false);
+  panelContent.selectAll(".edge-list-item[data-node-id]").on("click",function(){const n=nodes.find(n=>n.id===this.getAttribute("data-node-id"));if(n)showNodeDetail(n)});
+}
+
+window.addEventListener("resize",()=>{simulation.force("center",d3.forceCenter(window.innerWidth/2,window.innerHeight/2));simulation.alpha(0.3).restart()});
+</script>
+</body>
+</html>

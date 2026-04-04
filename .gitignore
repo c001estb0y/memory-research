@@ -16,6 +16,13 @@ desktop.ini
 *.swp
 *.swo
 
+# Database files
+kuzu_db
+
+# Python cache
+__pycache__/
+.pytest_cache/
+
 # Third-party cloned source repos (root-level only)
 /ClaudeCode/
 /ClawXMemory/
