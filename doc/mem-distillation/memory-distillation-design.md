@@ -149,6 +149,28 @@ class EngineeringExperience(BaseModel):
         description="该经验的置信度，0-1 之间"
     )
 
+    # ── 召回阶段动态演化字段（蒸馏时初始化，召回时更新）──
+    recall_score: float = Field(
+        default=0.5,
+        description="召回置信度，初始值取 confidence，每次召回后根据反馈动态调整"
+    )
+    recall_count: int = Field(
+        default=0,
+        description="被召回的总次数"
+    )
+    hit_count: int = Field(
+        default=0,
+        description="召回后被判定为'有用'的次数"
+    )
+    miss_count: int = Field(
+        default=0,
+        description="召回后被判定为'无用/误导'的次数"
+    )
+    last_hit_at: Optional[str] = Field(
+        default=None,
+        description="最后一次被判定为有用的时间 (ISO 8601)"
+    )
+
 
 class DistillationResult(BaseModel):
     """单次蒸馏批次的输出"""
@@ -1263,7 +1285,314 @@ def should_apply_experience(exp: EngineeringExperience, current_env: dict) -> bo
      按需检索          写进 wiki       分享/onboarding
 ```
 
-## 10. 后续扩展
+## 10. 召回置信度：越用越准的反馈闭环
+
+### 10.1 两种 confidence 的区别
+
+系统中存在两种不同含义的置信度，不能混淆：
+
+| | `confidence`（蒸馏时产生） | `recall_score`（召回时演化） |
+|---|---|---|
+| **含义** | LLM 对这条经验"提取得准不准"的评估 | 这条经验被召回后"有没有真的帮上忙" |
+| **产生时机** | 蒸馏时，一次性打分 | 首次取 `confidence` 值，每次召回后更新 |
+| **性质** | 静态，写入后不再变化 | 动态，随反馈信号持续调整 |
+| **解决什么** | 过滤 LLM 蒸馏的低质量输出 | 提升下次召回的精准度 |
+| **衰减** | 无 | 长时间未命中会自然衰减 |
+
+### 10.2 整体流程
+
+```
+蒸馏阶段（生产经验）               召回阶段（消费经验）
+                                
+confidence: 0.85 ──初始化──▶ recall_score: 0.85
+                                     │
+                                     ▼
+                              经验被召回，Agent 使用
+                                     │
+                                     ▼
+                               实际有用吗？
+                              ┌──────┴──────┐
+                              ▼             ▼
+                           有用 👍       没用 👎
+                              │             │
+                              ▼             ▼
+                      recall_score    recall_score
+                        += 0.1         -= 0.15
+                      hit_count++    miss_count++
+                              │             │
+                              └──────┬──────┘
+                                     ▼
+                              下次召回排序时
+                        语义相似度 × recall_score
+                              = 最终排序分
+```
+
+### 10.3 Load 阶段初始化
+
+蒸馏写入时，用 `confidence` 初始化 `recall_score`：
+
+```python
+def load_experiences(result: DistillationResult, output_path: str, min_confidence: float = 0.5) -> int:
+    """写入时初始化召回字段"""
+    # ...现有去重逻辑...
+    for exp in result.experiences:
+        if exp.confidence < min_confidence:
+            continue
+        entry = exp.model_dump()
+        entry['_hash'] = compute_experience_hash(exp)
+        entry['_distilled_at'] = datetime.utcnow().isoformat() + 'Z'
+
+        # 用 confidence 初始化 recall_score
+        entry['recall_score'] = exp.confidence
+        entry['recall_count'] = 0
+        entry['hit_count'] = 0
+        entry['miss_count'] = 0
+        entry['last_hit_at'] = None
+
+        existing.append(entry)
+        added += 1
+    # ...
+```
+
+### 10.4 召回排序
+
+当 Agent 遇到问题需要匹配经验时，排序公式为：
+
+```python
+def rank_experiences(
+    candidates: List[dict],
+    query_embedding: List[float],
+    current_env: dict,
+    time_decay_days: int = 30
+) -> List[dict]:
+    """召回排序：语义相似度 × recall_score × 时间衰减 × scope 过滤"""
+
+    ranked = []
+    now = datetime.utcnow()
+
+    for exp in candidates:
+        # Step 1: scope 过滤 — 环境不匹配的直接跳过
+        if not should_apply_experience(exp, current_env):
+            continue
+
+        # Step 2: 语义相似度
+        semantic_sim = cosine_similarity(query_embedding, exp.get("embedding", []))
+
+        # Step 3: recall_score（核心动态置信度）
+        recall = exp.get("recall_score", 0.5)
+
+        # Step 4: 时间衰减 — 长期未被命中的经验逐渐降权
+        last_hit = exp.get("last_hit_at")
+        if last_hit:
+            days_since = (now - datetime.fromisoformat(last_hit.rstrip('Z'))).days
+            time_factor = max(0.3, 1.0 - (days_since / time_decay_days) * 0.5)
+        else:
+            # 从未被命中过，用蒸馏时间计算
+            distilled = exp.get("_distilled_at", "")
+            if distilled:
+                days_since = (now - datetime.fromisoformat(distilled.rstrip('Z'))).days
+                time_factor = max(0.2, 1.0 - (days_since / time_decay_days) * 0.3)
+            else:
+                time_factor = 0.5
+
+        # 最终排序分
+        exp["_rank_score"] = semantic_sim * recall * time_factor
+        ranked.append(exp)
+
+    return sorted(ranked, key=lambda x: x["_rank_score"], reverse=True)
+```
+
+### 10.5 反馈更新
+
+召回后根据实际效果更新 `recall_score`：
+
+```python
+def update_recall_score(exp: dict, was_helpful: bool) -> dict:
+    """召回后根据反馈更新置信度"""
+
+    exp["recall_count"] = exp.get("recall_count", 0) + 1
+
+    if was_helpful:
+        exp["hit_count"] = exp.get("hit_count", 0) + 1
+        exp["last_hit_at"] = datetime.utcnow().isoformat() + "Z"
+        # 正反馈：温和上升（+0.1），上限 1.0
+        exp["recall_score"] = min(1.0, exp.get("recall_score", 0.5) + 0.1)
+    else:
+        exp["miss_count"] = exp.get("miss_count", 0) + 1
+        # 负反馈：下降更快（-0.15），下限 0.05
+        # 设计意图：惩罚 > 奖励，避免噪音经验长期占据高位
+        exp["recall_score"] = max(0.05, exp.get("recall_score", 0.5) - 0.15)
+
+    return exp
+```
+
+**为什么惩罚（-0.15）大于奖励（+0.1）？**
+
+一条经验如果被召回但没帮上忙，下次再召回的损失更大：
+- 占用了 Agent 的上下文窗口
+- 可能误导 Agent 往错误方向行动（比如在 Mac 上执行 `sed 's/\r$//'`）
+- 相当于用噪音挤掉了真正有用的经验
+
+所以负反馈的权重应该大于正反馈，让低质量经验快速沉底。
+
+### 10.6 反馈信号来源
+
+"有没有帮上忙"的判定是整个闭环中最关键的环节，有三种信号来源：
+
+#### 信号一：隐式反馈（自动化，推荐优先实现）
+
+```python
+def check_implicit_feedback(
+    exp: dict,
+    recent_memories: List[dict],
+    lookback_hours: int = 72
+) -> Optional[bool]:
+    """
+    隐式反馈：经验被召回后，同类问题是否在后续记忆中再次出现？
+    - 再次出现 → False（没帮上忙，同样的坑又踩了）
+    - 未再出现 → True（可能有效）
+    """
+    recall_time = exp.get("last_hit_at") or exp.get("_distilled_at")
+    if not recall_time:
+        return None
+
+    # 只看召回之后的记忆
+    cutoff = datetime.fromisoformat(recall_time.rstrip('Z'))
+
+    for mem in recent_memories:
+        mem_time = datetime.fromisoformat(mem.get("created_at", "").rstrip('Z'))
+        if mem_time <= cutoff:
+            continue
+
+        # 用 trigger_patterns 匹配后续记忆
+        mem_text = (mem.get("text", "") + " " + mem.get("title", "")).lower()
+        for pattern in exp.get("trigger_patterns", []):
+            # 简单关键词匹配，后续可升级为 embedding 语义匹配
+            pattern_words = set(pattern.lower().split())
+            mem_words = set(mem_text.split())
+            overlap = len(pattern_words & mem_words) / max(len(pattern_words), 1)
+            if overlap > 0.5:
+                # 同类问题又出现了
+                return False
+
+    # 召回后未再出现同类问题
+    if exp.get("recall_count", 0) > 0:
+        return True
+
+    return None  # 无法判定（从未被召回过）
+```
+
+**优势**：完全自动化，不需要人参与，成本为零
+**局限**：只能判断"同类问题是否消失"，无法判断"经验是否真正被执行了"
+
+#### 信号二：Agent 自判（中等可靠度）
+
+Agent 在使用经验后，自行判断是否有效：
+
+```python
+RECALL_FEEDBACK_PROMPT = """你刚才在处理问题时参考了以下经验：
+
+issue_context: {issue_context}
+solution: {solution}
+prevention: {prevention}
+
+请判断这条经验对你解决当前问题是否有帮助：
+- "helpful": 你实际采用了其中的方案或受到了启发
+- "not_helpful": 这条经验与当前问题无关，或方案不适用
+- "misleading": 这条经验误导了你的排查方向
+
+只返回一个词：helpful / not_helpful / misleading
+"""
+```
+
+**优势**：能判断经验是否被实际执行
+**局限**：Agent 自我评估可能不准确，需要定期与隐式反馈交叉验证
+
+#### 信号三：人工标注（最可靠，成本最高）
+
+在经验被召回并展示给用户时，提供 👍/👎 按钮：
+
+```
+┌─────────────────────────────────────────────┐
+│ 💡 匹配到相关经验：                          │
+│                                             │
+│ Bearer Token 认证失败时，先检查 Authorization │
+│ 头是否包含 'Bearer ' 前缀和空格              │
+│                                             │
+│ recall_score: 0.85 | 命中 12 次              │
+│                                             │
+│              [👍 有用]  [👎 没用]             │
+└─────────────────────────────────────────────┘
+```
+
+**优势**：最可靠的信号
+**局限**：依赖用户参与，大多数时候不会主动点击
+
+#### 推荐的实施顺序
+
+| 优先级 | 信号源 | 实施成本 | 信号可靠度 |
+|--------|--------|---------|-----------|
+| **P0** | 隐式反馈 | 低（只需对比后续记忆） | ⭐⭐⭐⭐ |
+| **P1** | Agent 自判 | 中（需要在 Agent 工作流中插入反馈步骤） | ⭐⭐⭐ |
+| **P2** | 人工标注 | 高（需要 UI 支持） | ⭐⭐⭐⭐⭐ |
+
+### 10.7 recall_score 生命周期示例
+
+以一条 Bearer Token 经验为例，展示 recall_score 从蒸馏到稳定的完整生命周期：
+
+```
+Day 0 — 蒸馏产出
+  confidence: 0.85 → recall_score: 0.85 (初始化)
+  recall_count: 0, hit: 0, miss: 0
+
+Day 3 — 被召回 #1：同事配置 MCP 时 401
+  Agent 参考 prevention，提示检查 Bearer 前缀 → 问题解决
+  feedback: helpful → recall_score: 0.85 + 0.10 = 0.95
+  recall_count: 1, hit: 1, miss: 0
+
+Day 7 — 被召回 #2：另一个项目的 API 认证问题
+  经验被匹配到，但该项目用的是 API Key 而非 Bearer Token
+  feedback: not_helpful → recall_score: 0.95 - 0.15 = 0.80
+  recall_count: 2, hit: 1, miss: 1
+
+Day 14 — 被召回 #3：新人 onboarding 配置 MCP
+  feedback: helpful → recall_score: 0.80 + 0.10 = 0.90
+  recall_count: 3, hit: 2, miss: 1
+
+Day 30+ — 隐式反馈：团队再无 Bearer 相关问题出现
+  check_implicit_feedback → True（问题消失了）
+  recall_score: 0.90 + 0.10 = 1.00 (到达上限)
+
+最终状态：recall_score=1.0, hit_rate=2/3=67%
+  这条经验在 Bearer Token 认证场景下被优先召回
+```
+
+### 10.8 与蒸馏管线的集成点
+
+```
+蒸馏管线                     召回系统                     反馈系统
+                                                       
+L1 蒸馏                      Agent 遇到问题              
+  │                             │                       
+  ▼                             ▼                       
+confidence ──初始化──▶ recall_score ◄──更新── update_recall_score()
+trigger_patterns ───▶ rank_experiences()         ▲
+scope ──────────────▶ should_apply_experience()  │
+                            │                    │
+                            ▼                    │
+                      Top-K 经验返回给 Agent      │
+                            │                    │
+                            ▼                    │
+                      Agent 使用经验              │
+                            │                    │
+                            ▼                    │
+                      反馈信号 ──────────────────┘
+                      (隐式/Agent自判/人工)
+```
+
+蒸馏阶段负责**生产高质量的初始信号**（`confidence` + `trigger_patterns` + `scope`），召回阶段负责**动态演化**（`recall_score` 随反馈持续调整）。两者配合形成"越用越准"的闭环。
+
+## 11. 后续扩展
 
 1. **回写标记** — 蒸馏完成后将 `distilled=1` 写回原始记录，避免重复处理
 2. **向量索引** — 对蒸馏经验做 embedding，支持语义检索（"MCP 鉴权相关的经验"）
@@ -1271,8 +1600,10 @@ def should_apply_experience(exp: EngineeringExperience, current_env: dict) -> bo
 4. **质量反馈环** — 团队成员对蒸馏经验标注"有用/无用"，迭代优化 System Prompt
 5. **多项目聚合** — 支持从多个 Shadow-Folk 项目（tank, dpar, shadowfolk 等）统一蒸馏
 6. **环境自动检测** — Agent 启动时自动采集 OS/Shell/IDE 信息，作为 scope 路由的输入
-7. **语义去重** — 对 `root_cause` 做 embedding，cosine similarity > 0.85 的视为重复，解决 v1 中 Bearer Token 问题出现 3 条、CRLF 出现 4 条的重复问题
-8. **Layer 3：编辑与取舍** — 在 L1+L2 全量提取后，增加一层"编辑判断"：从全量经验中选出 Top N 最值得分享的，生成带主次的精选版本（弥补管线缺少编辑判断力的短板）
+7. **语义去重** — 对 `root_cause` 做 embedding，cosine similarity > 0.85 的视为重复
+8. **Layer 3：编辑与取舍** — 从全量经验中选出 Top N 最值得分享的，生成带主次的精选版
+9. **recall_score 冷启动优化** — 新蒸馏的经验 recall_score 偏低导致排序靠后，可引入"探索-利用"策略：新经验有 N 次"保护期"召回，不受 recall_score 排序惩罚
+10. **similarity_cluster_id** — 语义相近的经验归为一组，组内只召回 recall_score 最高的，避免重复召回同一类经验占满 Top-K
 
 ## 附录：文档关系说明
 
