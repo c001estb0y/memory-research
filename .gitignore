@@ -18,10 +18,18 @@ desktop.ini
 
 # Database files
 kuzu_db
+*.db
 
 # Python cache
 __pycache__/
 .pytest_cache/
+
+# Env files
+.env
+.env.local
+
+# Distillation logs (可本地重新生成)
+doc/mem-distillation/distill.log
 
 # Third-party cloned source repos (root-level only)
 /ClaudeCode/

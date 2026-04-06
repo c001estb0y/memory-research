@@ -1,0 +1,5700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShadowFolk 知识图谱 — Graphiti Pipeline</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Share+Tech+Mono&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-void: #020810;
+    --bg-surface: #06101e;
+    --bg-elevated: #0a1628;
+    --bg-card: #081220;
+
+    /* ── Blue Spectrum ── */
+    --blue-electric: #00c8ff;
+    --blue-electric-glow: rgba(0, 200, 255, 0.4);
+
+    --blue-ice: #64e4ff;
+    --blue-ice-glow: rgba(100, 228, 255, 0.35);
+
+    --blue-deep: #3a7bff;
+    --blue-deep-glow: rgba(58, 123, 255, 0.4);
+
+    --blue-violet: #6e5cff;
+    --blue-violet-glow: rgba(110, 92, 255, 0.35);
+
+    --blue-steel: #4a90d9;
+    --blue-steel-glow: rgba(74, 144, 217, 0.3);
+
+    --accent: #00c8ff;
+    --accent-bright: #64e4ff;
+    --accent-glow: rgba(0, 200, 255, 0.35);
+
+    --text-primary: #c8d8f0;
+    --text-secondary: #7088b0;
+    --text-tertiary: #3a5078;
+    --text-faint: #1e3050;
+
+    --grid-line: rgba(0, 200, 255, 0.025);
+    --border: rgba(0, 200, 255, 0.08);
+    --border-hover: rgba(0, 200, 255, 0.22);
+
+    --edge-default: #142240;
+    --edge-expired: #0c1628;
+  }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: 'Exo 2', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+
+  /* ── Background ── */
+  #graph-container {
+    flex: 1;
+    position: relative;
+    background:
+      radial-gradient(ellipse 60% 50% at 12% 30%, rgba(0,200,255,0.03) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 82% 55%, rgba(58,123,255,0.025) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 35% at 50% 12%, rgba(110,92,255,0.03) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 80% at 50% 85%, rgba(0,200,255,0.012) 0%, transparent 70%),
+      var(--bg-void);
+  }
+
+  /* Grid */
+  #graph-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, var(--grid-line) 0px, transparent 1px, transparent 80px),
+      repeating-linear-gradient(90deg, var(--grid-line) 0px, transparent 1px, transparent 80px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanline */
+  #graph-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(180deg, transparent 0px, rgba(0,0,0,0.012) 2px, transparent 4px);
+    pointer-events: none;
+    z-index: 0;
+    animation: scanMove 8s linear infinite;
+  }
+  @keyframes scanMove {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(4px); }
+  }
+
+  svg { width: 100%; height: 100%; position: relative; z-index: 1; }
+  .node-glow { filter: url(#glow); }
+
+  /* ── Detail Panel ── */
+  #detail-panel {
+    width: 400px;
+    min-width: 400px;
+    background: linear-gradient(175deg, var(--bg-surface) 0%, #030a14 100%);
+    border-left: 1px solid var(--border);
+    padding: 36px 28px;
+    overflow-y: auto;
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: -30px 0 80px rgba(0, 0, 0, 0.6);
+    position: relative;
+  }
+  #detail-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--blue-deep), var(--blue-electric), var(--blue-ice));
+    opacity: 0.5;
+  }
+  #detail-panel::-webkit-scrollbar { width: 3px; }
+  #detail-panel::-webkit-scrollbar-track { background: transparent; }
+  #detail-panel::-webkit-scrollbar-thumb { background: var(--blue-deep); border-radius: 3px; opacity: 0.5; }
+  #detail-panel::-webkit-scrollbar-thumb:hover { background: var(--blue-electric); }
+
+  #detail-panel.hidden {
+    transform: translateX(100%);
+    width: 0; min-width: 0; padding: 0;
+    border: none; overflow: hidden; box-shadow: none;
+  }
+
+  #detail-panel h2 {
+    font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #fff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px var(--accent-glow);
+  }
+  #detail-panel .type-badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-bottom: 22px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+  #detail-panel .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--blue-electric);
+    margin: 30px 0 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-shadow: 0 0 8px var(--blue-electric-glow);
+  }
+  #detail-panel .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(0,200,255,0.2), transparent);
+  }
+  #detail-panel .fact-text {
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--text-secondary);
+    background: linear-gradient(135deg, rgba(6,16,30,0.95), rgba(4,12,24,0.95));
+    padding: 18px 20px;
+    border-radius: 4px;
+    border-left: 2px solid var(--blue-electric);
+    margin-bottom: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 0 30px rgba(0,200,255,0.015);
+    position: relative;
+  }
+  #detail-panel .fact-text::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 2px; height: 100%;
+    background: var(--blue-electric);
+    box-shadow: 0 0 8px var(--blue-electric-glow), 0 0 20px var(--blue-electric-glow);
+  }
+  #detail-panel .meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 11px 0;
+    border-bottom: 1px solid rgba(20,34,64,0.5);
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+  #detail-panel .meta-row:hover {
+    background: rgba(0,200,255,0.03);
+    margin: 0 -10px;
+    padding: 11px 10px;
+    border-radius: 4px;
+  }
+  #detail-panel .meta-row .label { color: var(--text-tertiary); font-weight: 500; letter-spacing: 0.3px; }
+  #detail-panel .meta-row .value {
+    color: var(--text-secondary);
+    text-align: right;
+    max-width: 220px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+  }
+
+  #detail-panel .edge-list-item {
+    background: linear-gradient(135deg, rgba(6,16,30,0.8), rgba(4,12,24,0.8));
+    padding: 15px 18px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    border: 1px solid rgba(0,200,255,0.05);
+    position: relative;
+    overflow: hidden;
+  }
+  #detail-panel .edge-list-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0;
+    background: linear-gradient(90deg, rgba(0,200,255,0.08), transparent);
+    transition: width 0.3s;
+  }
+  #detail-panel .edge-list-item:hover::before { width: 100%; }
+  #detail-panel .edge-list-item:hover {
+    border-color: var(--border-hover);
+    transform: translateX(6px);
+    box-shadow: 0 0 20px rgba(0,200,255,0.06), inset 0 0 20px rgba(0,200,255,0.02);
+  }
+  #detail-panel .edge-list-item .rel {
+    color: var(--blue-ice);
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+    text-shadow: 0 0 6px var(--blue-ice-glow);
+  }
+  #detail-panel .edge-list-item .target { color: var(--text-secondary); margin-left: 8px; position: relative; z-index: 1; }
+
+  #close-panel {
+    position: absolute;
+    top: 20px;
+    right: 18px;
+    background: rgba(0,200,255,0.04);
+    border: 1px solid rgba(0,200,255,0.12);
+    color: var(--text-tertiary);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    width: 34px;
+    height: 34px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s;
+  }
+  #close-panel:hover {
+    color: var(--blue-ice);
+    background: rgba(0,200,255,0.08);
+    border-color: rgba(0,200,255,0.35);
+    box-shadow: 0 0 16px rgba(0,200,255,0.12);
+    text-shadow: 0 0 8px var(--blue-electric-glow);
+  }
+
+  /* ── Legend ── */
+  #legend {
+    position: absolute;
+    top: 28px;
+    left: 28px;
+    background: rgba(3, 10, 20, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+    font-size: 13px;
+    pointer-events: none;
+    backdrop-filter: blur(24px) saturate(1.3);
+    box-shadow: 0 0 40px rgba(0,0,0,0.4), inset 0 0 40px rgba(0,200,255,0.015);
+    z-index: 10;
+    position: relative;
+  }
+  #legend::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--blue-deep), var(--blue-electric), var(--blue-ice));
+    opacity: 0.4;
+  }
+  #legend .title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--blue-electric);
+    margin-bottom: 16px;
+    font-weight: 700;
+    text-shadow: 0 0 10px var(--blue-electric-glow);
+  }
+  #legend .item { display: flex; align-items: center; margin-bottom: 11px; }
+  #legend .item:last-child { margin-bottom: 0; }
+  #legend .dot {
+    width: 6px; height: 6px; margin-right: 14px; flex-shrink: 0;
+    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+  #legend .item-label {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-size: 12px;
+    font-family: 'Exo 2', 'Noto Sans SC', sans-serif;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Stats Bar ── */
+  #stats-bar {
+    position: absolute;
+    top: 28px;
+    right: 28px;
+    display: flex;
+    gap: 10px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .stat-chip {
+    background: rgba(3, 10, 20, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 18px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    backdrop-filter: blur(24px) saturate(1.3);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    font-family: 'Exo 2', sans-serif;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-chip::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--blue-electric), transparent);
+    opacity: 0.25;
+  }
+  .stat-chip .stat-num {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    text-shadow: 0 0 12px var(--blue-electric-glow);
+  }
+
+  /* ── Title ── */
+  #title-bar {
+    position: absolute;
+    bottom: 32px;
+    left: 32px;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+  }
+  #title-bar .main-title {
+    font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-shadow: 0 0 20px var(--blue-electric-glow);
+  }
+  #title-bar .main-title .logo-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--blue-electric);
+    box-shadow: 0 0 12px var(--blue-electric-glow), 0 0 30px var(--blue-electric-glow);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 12px var(--blue-electric-glow), 0 0 30px var(--blue-electric-glow); }
+    50% { opacity: 0.3; box-shadow: 0 0 4px var(--blue-electric-glow); }
+  }
+  #title-bar .sub-title {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-left: 20px;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    font-family: 'Share Tech Mono', monospace;
+    text-transform: uppercase;
+  }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(3, 10, 20, 0.96);
+    border: 1px solid var(--border-hover);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-width: 320px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 100;
+    backdrop-filter: blur(24px);
+    box-shadow: 0 0 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,200,255,0.04);
+  }
+
+  /* ── Keyboard Hints ── */
+  #keyboard-hint {
+    position: absolute;
+    bottom: 32px;
+    right: 32px;
+    display: flex;
+    gap: 14px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .kbd-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: 'Exo 2', sans-serif;
+  }
+  .kbd {
+    background: rgba(0,200,255,0.04);
+    border: 1px solid rgba(0,200,255,0.1);
+    border-radius: 2px;
+    padding: 3px 9px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--blue-steel);
+    text-shadow: 0 0 4px var(--blue-steel-glow);
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes glitchIn {
+    0% { opacity: 0; transform: translateX(-4px) skewX(-2deg); }
+    40% { opacity: 0.8; transform: translateX(2px) skewX(1deg); }
+    60% { opacity: 0.9; transform: translateX(-1px) skewX(0deg); }
+    100% { opacity: 1; transform: translateX(0) skewX(0deg); }
+  }
+  #legend { animation: glitchIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  #stats-bar { animation: glitchIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+  #title-bar { animation: glitchIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
+  #keyboard-hint { animation: fadeIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both; }
+</style>
+</head>
+<body>
+<div id="graph-container">
+  <svg id="graph-svg">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="glow-strong" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="12" result="coloredBlur"/>
+        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <marker id="arrow" viewBox="0 0 10 6" refX="28" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,3 L0,6 Z" fill="#142240"/>
+      </marker>
+      <marker id="arrow-highlight" viewBox="0 0 10 6" refX="28" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,3 L0,6 Z" fill="#00c8ff"/>
+      </marker>
+    </defs>
+  </svg>
+  <div id="legend">
+    <div class="title">Node Types</div>
+    <div class="item"><div class="dot" style="background:#64e4ff;color:#64e4ff"></div><span class="item-label">人物</span></div>
+    <div class="item"><div class="dot" style="background:#3a7bff;color:#3a7bff"></div><span class="item-label">技术 / 工具</span></div>
+    <div class="item"><div class="dot" style="background:#6e5cff;color:#6e5cff"></div><span class="item-label">文档 / 文件</span></div>
+    <div class="item"><div class="dot" style="background:#ff8c42;color:#ff8c42"></div><span class="item-label">概念 / 方案</span></div>
+    <div class="item"><div class="dot" style="background:#ff4a6b;color:#ff4a6b"></div><span class="item-label">问题 / Bug</span></div>
+  </div>
+  <div id="stats-bar">
+    <div class="stat-chip"><span class="stat-num" id="node-count">0</span>Nodes</div>
+    <div class="stat-chip"><span class="stat-num" id="edge-count">0</span>Edges</div>
+  </div>
+  <div id="title-bar">
+    <div class="main-title"><div class="logo-dot"></div>ShadowFolk Knowledge Graph</div>
+    <div class="sub-title">graphiti pipeline // kuzu embedded // minusjiang_shadowfolk_export.db</div>
+  </div>
+  <div id="keyboard-hint">
+    <div class="kbd-item"><span class="kbd">Scroll</span> Zoom</div>
+    <div class="kbd-item"><span class="kbd">Drag</span> Move</div>
+    <div class="kbd-item"><span class="kbd">Click</span> Detail</div>
+  </div>
+  <div id="tooltip"></div>
+</div>
+<div id="detail-panel" class="hidden">
+  <button id="close-panel">&times;</button>
+  <div id="panel-content"></div>
+</div>
+<script>
+const nodes = [
+  {
+    "id": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "label": "minusjiang",
+    "type": "person",
+    "summary": "minusjiang 偏好 使用 CLI 作为首选工具。\nminusjiang 询问 是否 需要 一个 Web 端。\nMinusjiang 使用 requirements.md 来明确当前 MVP 的范围、优先级与落地计划。\nMinusjiang 使用 mvp-plan.md 来明确当前 MVP 的范围、优先级与落地计划。\nMinusjiang 使用 mvp-todolist.md 来明确当前 MVP 的范围、优先级与落地计划。\n尚未形成可验收的统一 MVP 定义。\n接口处于雏形阶段。\n状态管理处于雏形阶段。\nminusjiang 指示通过 MCP 在本地代码库中搜索关键词/符号以定位相关代码。\nminusjiang 触发对 MCP Worker 的检查与重启。\nminusjiang 触发对搜索服务的检查与重启。\nminusjiang 将本地搜索工具作为后备方案以应对 MCP 异常。\nminusjiang 负责为 UI Enhancement v3 制定并完善功能规划与待办清单。\nminusjiang 使用 MCP 的项目搜索来收集实现 UI Enhancement v3 所需的信息。\nminusjiang 支持并推进本地项目中的 UI Enhancement v3。\nminusjiang 改善了开发流程。\nminusjiang 修复了与 MCP 搜索相关的工具链问题。\nminusjiang 修复了与 Git 初始化相关的工具链问题。\nminusjiang 在本地项目上协助推进 UI Enhancement v3。\nminusjiang 在本地项目上工作。\nminusjiang 将本地项目初始化为本地 Git 仓库\nminusjiang 将本地项目初始化为 Git 仓库\nminusjiang 将本地项目推送至 GitHub\nminusjiang 改善 前端 UI 组件\nminusjiang 增强 前端活动流\nminusjiang 增强 卡片\nminusjiang 增强 ShadowCard\n在单仓项目中为记忆/活动系统加入中文摘要支持\n通过提供中文摘要支持增强记忆/活动系统\n完成 Git 远程配置\n完成本地开发/推送流程的首推\nminusjiang 修复了由 Vite 报告的前端构建与类型错误，使本地开发服务器成功启动\nMinusjiang identified and fixes the missing named export for StationCanvas, enabling the frontend build.\nMinusjiang 纠正了 OfficeLayout 的类型签名。\nMinusjiang 纠正了 tiles 的类型签名。\nminusjiang 请求 一份 针对 基于 HTML5 Canvas 的 赛博朋克霓虹像素风仪表盘 UI 的设计规范。\nminusjiang 请求 一份 针对 基于 HTML5 Canvas 的 赛博朋克霓虹像素风仪表盘 UI 的实现步骤。\n对前端 TypeScript/React 项目的问题进行诊断和修复以提升开发环境的稳定性。\n推动前端 UI/UX 的改进。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "label": "CLI",
+    "type": "tech",
+    "summary": "minusjiang 偏好 使用 CLI 作为首选工具。\nCLI 仅靠自身难以满足对 Profile、权限与全局可视化的需求，因此需要构建 Shadow Hub Web 管理端来承载高级管理与可视化。\nCLI 充当数据管道的角色。\nMVP 应包含 CLI 数据推送能力。\n离线导入/导出能力与 CLI 集成\nCLI 能与服务端数据库协同工作。\nCLI 在 Windows 环境下运行。\nCLI 可与 服务端数据库 正常工作。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "label": "MCP",
+    "type": "tech",
+    "summary": "MCP 将作为统一的远端交互通道。\nMCP 支持 分支登记。\nMCP 支持 记忆上传。\nMCP 支持 技能检索。\nMCP 工具 与 API 描述实现统一。\n离线导入/导出能力与 MCP 集成\nMCP 工具 触发本地项目中的代码搜索\nMCP 搜索 关键词/符号\nMCP 在本地代码库中执行搜索\nminusjiang 指示通过 MCP 在本地代码库中搜索关键词/符号以定位相关代码。\nMCP 使用本地代码库来执行关键词/符号搜索。\nMCP 使用其项目搜索接口。\nMCP 在本地项目中执行搜索。\nMCP 与 Worker API 存在配置或稳定性问题。\nMCP 在本地项目中搜索与 UI增强v3 相关的内容以完善文档。\nMCP 定位与 UI增强v3 相关内容以完善文档。\nMCP 的搜索旨在完善 文档。\nMCP 使用搜索调用的参数并进行校验。\nMCP 更新了搜索配置以支持参数传递及错误处理与重试。\nminusjiang 使用 MCP 的项目搜索来收集实现 UI Enhancement v3 所需的信息。\nMCP 搜索接口需要显式提供 project 参数。\nMCP 搜索接口需要显式提供 query 参数。\nMCP initiates a project-internal search\nMCP uses local index/grep as a fallback\nMCP attempts project search due to interface errors\nMCP 执行 MCP 搜索。\nMCP 对 项目 执行搜索。\nMCP 检查 Worker/MCP 的连接配置是否正常。\nMCP 搜索相关的问题涉及 Git 初始化。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "da59d92e-0428-40aa-8285-227cfc0f5a9b",
+    "label": "Shadow",
+    "type": "tech",
+    "summary": "本地开发分支的分支名上传到 Shadow。\nShadow 将以小人形象呈现，用于实现动画与可视化效果。\n仅在作为项目/系统名称的场景将 ShadowPerson 重命名为 ShadowFolk，且保留组件/概念名不变。\n仅在作为项目/系统名称的场景将 ShadowPerson 重命名为 ShadowFolk，且保留组件/概念名不变。\n仅在作为项目/系统名称的场景将 ShadowPerson 重命名为 ShadowFolk，且保留组件/概念名不变。\n仅在作为项目/系统名称的场景将 ShadowPerson 重命名为 ShadowFolk，且保留组件/概念名不变。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0af6d4ba-2dc3-483f-9ff4-3de9f0a42cdb",
+    "label": "本地开发分支",
+    "type": "concept",
+    "summary": "本地开发分支的分支名上传到 Shadow。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6ae28f1b-1091-4de6-b0a2-ebe5ab4c41c3",
+    "label": "分支名",
+    "type": "concept",
+    "summary": "User inquired about how to upload branch names to Shadow from local development branches.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "79f59257-3048-4edc-8183-085c22f9d2e1",
+    "label": "mem 数据库",
+    "type": "concept",
+    "summary": "mem 数据库将通过 记忆上传 的流程进行制定与上传。\nbetter-sqlite3 使用内存库，并且内存库中已建表且可查询。\nSQLite 的内存数据库已建表并可查询。\n内存数据库 具有 表结构。\n内存数据库的记录量已成功查询。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "81b47d21-eb29-4eef-8989-f8dc891c74b6",
+    "label": "Workspace",
+    "type": "concept",
+    "summary": "在 Workspace 中填写 姓名。\nWorkspace 配置 权限。\nWorkspace 与 AgentSkill 模型实现标准化。\nWorkspace 与 DevStatus 模型实现标准化。\nWorkspace 与 API 模型实现标准化。\nWorkspace 将替代以 Person 为中心的权限与可见性管理模式。\n需求文档应纳入 Workspace 概念。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2fd3564b-4930-482a-a5fa-bbdaf309cb94",
+    "label": "权限",
+    "type": "concept",
+    "summary": "Workspace 配置 权限。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "53d19121-661b-4199-b057-c3910160c037",
+    "label": "姓名",
+    "type": "concept",
+    "summary": "在 Workspace 中填写 姓名。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "69b101ad-cc41-4435-8e12-9caddc762337",
+    "label": "API",
+    "type": "tech",
+    "summary": "Workspace 与 API 模型实现标准化。\nMCP 工具 与 API 描述实现统一。\n需求文档应纳入 API 面向的描述与扩展。\n接口处于雏形阶段。\n接口需要与端到端用户路径整合。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a327cf90-84eb-46af-9e38-432040e8cd9f",
+    "label": "AgentSkill",
+    "type": "concept",
+    "summary": "Workspace 与 AgentSkill 模型实现标准化。\nAgentSkill 支持 DevStatus，用于技能索引与开发进度跟踪。\n需求文档应纳入 AgentSkill 概念。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f4a9a1a4-7444-4e84-9b99-6b95fe9e4769",
+    "label": "DevStatus",
+    "type": "concept",
+    "summary": "Workspace 与 DevStatus 模型实现标准化。\nAgentSkill 支持 DevStatus，用于技能索引与开发进度跟踪。\n需求文档应纳入 DevStatus 概念。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ed562d20-982b-434f-85f4-5d586beb0f83",
+    "label": "Web 端",
+    "type": "concept",
+    "summary": "minusjiang 询问 是否 需要 一个 Web 端。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "1cd9d869-0d68-4401-a98b-cea6b239e06e",
+    "label": "多人协作",
+    "type": "concept",
+    "summary": "Insights indicate that permissions and visibility need to be isolated by Workspace to support multi-person collaboration and fine-grained permissions.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "28e30285-f6a7-4bef-b11e-b97e689a3ed9",
+    "label": "服务器",
+    "type": "concept",
+    "summary": "服务器 将 对 各人员的活动 进行可视化查看。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9f6fb585-f3f4-4732-9dd4-eeda969b2951",
+    "label": "人员",
+    "type": "concept",
+    "summary": "服务器 将 对 各人员的活动 进行可视化查看。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "01152eea-de62-4453-922c-8822b3874966",
+    "label": "身份信息",
+    "type": "concept",
+    "summary": "User asked how to fill in identity information as part of the development process.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8a324b25-75d6-4ad3-9634-6d296b31b58c",
+    "label": "附录 B",
+    "type": "concept",
+    "summary": "版本 v3.0 将对附录 B 进行升级，并修复截断与链接问题。\n文档附录 B 需要补全。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8cdc2cad-7083-42de-9244-fe19b0faf0b3",
+    "label": "文档",
+    "type": "document",
+    "summary": "Document is incomplete and requires completion, particularly sections 4.3 and Appendix B.\nMCP 的搜索旨在完善 文档。\nUI增强v3 文档已编辑更新。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "d03fe084-dc1a-43c9-8e43-82a739ad8844",
+    "label": "分支登记",
+    "type": "concept",
+    "summary": "MCP 支持 分支登记。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "bb805c53-d550-4255-87b9-23c847e170ab",
+    "label": "记忆上传",
+    "type": "concept",
+    "summary": "mem 数据库将通过 记忆上传 的流程进行制定与上传。\nMCP 支持 记忆上传。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "899ae7ff-8ed9-4614-9832-7d72e90c726e",
+    "label": "技能检索",
+    "type": "concept",
+    "summary": "MCP 支持 技能检索。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "63101d7c-32e9-4eef-9888-1ad9bd096a39",
+    "label": "远端交互通道",
+    "type": "concept",
+    "summary": "MCP 将作为统一的远端交互通道。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "335be26a-65af-4a4d-99e6-59c35787e768",
+    "label": "后端",
+    "type": "concept",
+    "summary": "后端 被定位为 轻索引。\n后端 以 重记忆 为定位。\n后端被描述为以重记忆为核心的架构定位（并辅以轻索引）。\n后端 使用 REST API 作为接口实现。\n后端 使用 数据库 存储数据。\nMVP 将与后端并行落地。\n后端返回 500 错误。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6cb06fba-2752-454d-87b1-cae2130946e6",
+    "label": "轻索引",
+    "type": "concept",
+    "summary": "后端 被定位为 轻索引。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a61a3de4-538d-4512-8479-6c5d74dedbae",
+    "label": "重记忆",
+    "type": "concept",
+    "summary": "后端 以 重记忆 为定位。\n后端被描述为以重记忆为核心的架构定位（并辅以轻索引）。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e9aba2f0-d42c-47b0-9304-0c7285ca16f6",
+    "label": "Agent",
+    "type": "concept",
+    "summary": "The backend aims to clarify the responsibilities between 'light indexing + heavy memory' to avoid overlapping with the local Agent.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "29c672ab-f00b-49d9-a2ba-ad08e78b6fa4",
+    "label": "Web 管理端",
+    "type": "concept",
+    "summary": "Future iterations will consider a Web management interface, which is optional as CLI is prioritized now.\nCLI 仅靠自身难以满足对 Profile、权限与全局可视化的需求，因此需要构建 Shadow Hub Web 管理端来承载高级管理与可视化。\nWeb 前端 提供 Web 管理界面。\n需求文档应纳入对 Web 管理界面的描述与规范。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "db73a2ce-fb95-435b-80d5-bf40d69485b2",
+    "label": "Person",
+    "type": "concept",
+    "summary": "Workspace 将替代以 Person 为中心的权限与可见性管理模式。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "3960f42c-7692-48a2-bd02-697d8189d889",
+    "label": "Profile",
+    "type": "concept",
+    "summary": "User requires a Shadow Hub Web management front end to meet needs for profile, permissions, and global visibility, with expectations for a high-end, animated UI featuring elements like small figures for shadows.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "39769733-b123-4c52-bf87-866fc5553220",
+    "label": "v3.0",
+    "type": "concept",
+    "summary": "版本 v3.0 将对附录 B 进行升级，并修复截断与链接问题。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b15c5b3e-20e6-4e9b-a7e4-1e60cf3d34dd",
+    "label": "小人形象",
+    "type": "concept",
+    "summary": "Shadow 将以小人形象呈现，用于实现动画与可视化效果。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "label": "需求文档",
+    "type": "document",
+    "summary": "文档附录 B 需要补全。\n需求文档应纳入 Workspace 概念。\n需求文档应纳入 DevStatus 概念。\n需求文档应纳入 AgentSkill 概念。\n需求文档应纳入 API 面向的描述与扩展。\n需求文档应纳入 工具 内容描述。\n需求文档应纳入 阶段路线图。\n需求文档应纳入对 Web 管理界面的描述与规范。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8abbf783-8e1b-4e7b-b980-cb7e41efe2af",
+    "label": "Web 前端",
+    "type": "concept",
+    "summary": "Web 前端 提供 Web 管理界面。\nShadow Hub Web 管理端为前端管理界面相关组件。\nUI 设计可应用于 Web 前端以实现高端界面。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2e4288ed-d271-40ef-a8d4-6f3787a4f6ec",
+    "label": "UI",
+    "type": "concept",
+    "summary": "UI 设计可应用于 Web 前端以实现高端界面。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "70e2a616-0c7d-4fac-a19e-f6743dc56e1d",
+    "label": "Shadow Hub Web 管理端",
+    "type": "tech",
+    "summary": "Shadow Hub Web 管理端为前端管理界面相关组件。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "label": "MVP",
+    "type": "concept",
+    "summary": "MVP 应包含 CLI 数据推送能力。\nMVP 将与后端并行落地。\nmvp-plan.md 描述了知识库的存在形式。\nmvp-plan.md 描述了 memory 的存在形式。\nMVP 以结构化文本存储为主要存储模式。\nMVP 的 Memory/Knowledge 存储与检索模型被梳理\nMVP 已覆盖登录/鉴权。\nMVP 已覆盖数据导入导出。\nMVP 已覆盖基础可视化中的仪表盘。\nMVP 已覆盖基础可视化中的活动流。\nMVP 已覆盖个人空间。\n尚未形成可验收的统一 MVP 定义。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "48c901a5-a742-4b10-9333-8a374cac52e1",
+    "label": "MCP Server",
+    "type": "tech",
+    "summary": "MCP Server 提供 AI 消费接口。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "eee292d3-2cc9-44cd-8982-3b26d5f6db5f",
+    "label": "AI 消费接口",
+    "type": "concept",
+    "summary": "MCP Server 提供 AI 消费接口。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "975b31d3-6551-4506-ae79-52f6596f96ae",
+    "label": "REST API",
+    "type": "tech",
+    "summary": "后端 使用 REST API 作为接口实现。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6560c372-6284-4310-a2ce-70fdfb88c828",
+    "label": "数据库",
+    "type": "concept",
+    "summary": "后端 使用 数据库 存储数据。\nMVP 使用 SQLite 数据库作为主存储以保存记录。\n本项目将 better-sqlite3 作为 SQLite 的首选驱动并使用。\nCLI 能与服务端数据库协同工作。\nSQLite 的内存数据库已建表并可查询。\n本项目将 better-sqlite3 作为 SQLite 的首选驱动并使用。\nCLI 能与服务端数据库协同工作。\nSQLite 的内存数据库已建表并可查询。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b5909883-d9d6-4d6e-979b-0628f536b4c0",
+    "label": "目录结构",
+    "type": "concept",
+    "summary": "技术选型需按前后端拆分，并重构目录结构。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "192da696-661e-4531-8797-67ddbd12ca73",
+    "label": "技术选型",
+    "type": "concept",
+    "summary": "技术选型需按前后端拆分，并重构目录结构。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b0bb2082-8658-4a8c-80f0-944a5ebab07b",
+    "label": "工具",
+    "type": "concept",
+    "summary": "需求文档应纳入 工具 内容描述。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "554d71f1-fc11-4dc9-b9cf-1c52c8d997a2",
+    "label": "阶段路线图",
+    "type": "concept",
+    "summary": "需求文档应纳入 阶段路线图。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ee14327f-3da8-44a8-abf4-3114aafa8185",
+    "label": "全局可视化",
+    "type": "concept",
+    "summary": "User noted that relying solely on CLI does not meet the needs for Profile, permissions, and global visualization; a Shadow Hub Web management frontend is necessary to fulfill higher management and visualization requirements.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "12cc350f-95a3-4146-800b-529ab9106762",
+    "label": "数据管道",
+    "type": "concept",
+    "summary": "CLI 充当数据管道的角色。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "c04a1eee-0274-4a33-b6f6-8c158a8ac4e4",
+    "label": "数据推送能力",
+    "type": "concept",
+    "summary": "MVP should include CLI data push capabilities, implemented alongside the backend for parallel development.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ec1870d3-c91d-43cf-a604-a4124f9ad10e",
+    "label": "design-intent-and-scenarios.md",
+    "type": "document",
+    "summary": "Document requires approximately 17 name replacements from 'ShadowPerson' to 'ShadowFolk' in specific contexts, with additional checks for remaining occurrences.\ndesign-intent-and-scenarios.md 存在广泛的 UTF-8 中文乱码。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "104ee4e6-0d48-4d63-a037-1e7416dfd7bf",
+    "label": "requirements.md",
+    "type": "document",
+    "summary": "Contains updates needed for certain names, including sections on '社区模型兼容性' which have been replaced accordingly.\nrequirements.md 未包含明确的开源仓库推荐列表，需扩大检索范围。\nMinusjiang 使用 requirements.md 来明确当前 MVP 的范围、优先级与落地计划。\n将 requirements.md 与 mvp-plan.md、mvp-todolist.md 的内容整合，生成 MVP范围声明、优先级与验收标准",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "db49ad95-b403-4423-8c43-bb45bfad7b3e",
+    "label": "社区模型兼容性",
+    "type": "concept",
+    "summary": "This entity has been updated in relevance to its context within the requirements document.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b4d8db02-690f-486d-a258-530a10f45e77",
+    "label": "UTF-8 编码",
+    "type": "concept",
+    "summary": "Document shows extensive UTF-8 encoding corruption resulting in broken characters, needing systematic repair.\ndesign-intent-and-scenarios.md 存在广泛的 UTF-8 中文乱码。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "93b7a908-3aa8-41a5-bcc0-d33cdbf2556a",
+    "label": "锟�?",
+    "type": "concept",
+    "summary": "Represents corrupted UTF-8 sequences within the documentation, requiring thorough identification and correction.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "1819ee6d-8080-4f1e-bfcc-72fe85cf1831",
+    "label": "二进制扫描",
+    "type": "concept",
+    "summary": "A binary scan revealed 529 instances of potentially corrupted UTF-8 sequences in design documentation that need fixing.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "755e6ae6-93a9-458a-be2c-c8e894ab16cc",
+    "label": "原始正确版本内容",
+    "type": "concept",
+    "summary": "Original correct content has been located to serve as a baseline for reconstructing corrupted documents.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "d0438f6c-df7d-45b3-9194-dd274c2c6eb4",
+    "label": "Python",
+    "type": "tech",
+    "summary": "Python can be utilized to handle corrupted UTF-8 sequences by generating valid characters based on context.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7150c979-363e-45db-b0c5-855492c92b3a",
+    "label": "Git",
+    "type": "tech",
+    "summary": "No available Git history exists for rollback; original correct versions are needed for document reconstruction.\nMCP 搜索相关的问题涉及 Git 初始化。\nGit 执行了首次提交。\nGit Bash 与 Git 配合使用。\nPowerShell 使用 && 会导致 Git 命令解析错误。\nPowerShell 使用会触发 Git 命令的解析错误。\nGit 在 PowerShell 上运行",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f64b07f4-f8c1-4b95-a467-a2d9ec349f1a",
+    "label": "知识库",
+    "type": "concept",
+    "summary": "mvp-plan.md 描述了知识库的存在形式。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "995f2d9b-2ee7-4ba7-aed6-5c31ff5520ae",
+    "label": "memory",
+    "type": "concept",
+    "summary": "mvp-plan.md 描述了 memory 的存在形式。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e470e950-5e39-4731-8b31-38c219874926",
+    "label": "开源仓库",
+    "type": "concept",
+    "summary": "requirements.md 未包含明确的开源仓库推荐列表，需扩大检索范围。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "bf9c285f-41f8-4c19-8195-db26018543bc",
+    "label": "知识库/Memory 形态",
+    "type": "concept",
+    "summary": "用户询问知识库和memory的存在形式，需从mvp-plan.md或相关设计描述中提取答案，尚未在会话中产出最终答案。\nMem0 与 Memory/Knowledge 存储与检索模型具有较高的契合度\nMVP 的 Memory/Knowledge 存储与检索模型被梳理\n结构化文本存储是该存储与检索模型的一种实现形式",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "eb3cdb03-c0f9-4e24-8bb9-4383d352351f",
+    "label": "记忆系统",
+    "type": "concept",
+    "summary": "当前MVP以SQLite文本记录为主，语义向量与蒸馏流程尚未落地，需评估两款开源框架以实现记忆系统的存储形态，选择更合适的方案。\n记忆/活动系统拥有中文摘要支持这一特性\n单仓项目为记忆/活动系统增加中文摘要支持\n通过提供中文摘要支持增强记忆/活动系统",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "669a8370-9c22-4478-89c5-5144618de645",
+    "label": "开源框架",
+    "type": "concept",
+    "summary": "开源框架能够承载记忆层。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ed89dfe7-b56e-4766-b3c4-61de43417363",
+    "label": "语义向量",
+    "type": "concept",
+    "summary": "MVP 尚未落地实现语义向量。\n语义向量将留待后续迭代实现。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0e3341cf-9ee0-4347-9458-bfd2a527cc10",
+    "label": "蒸馏流程",
+    "type": "concept",
+    "summary": "MVP 尚未落地实现蒸馏流程。\n蒸馏流程将留待后续迭代实现。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "89dedc39-8ed9-47fd-b8ec-5e2334127324",
+    "label": "最小可行性产品",
+    "type": "concept",
+    "summary": "MVP 使用 SQLite 数据库作为主存储以保存记录。\nMVP 尚未落地实现语义向量。\nMVP 尚未落地实现蒸馏流程。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "c42cab76-1c00-404e-8645-256e1c04c39b",
+    "label": "记忆层",
+    "type": "concept",
+    "summary": "开源框架能够承载记忆层。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8de34740-9b51-4828-875a-eedf3cd0670d",
+    "label": "代理编排",
+    "type": "concept",
+    "summary": "在项目中引入代理编排以支持轻量持久化和记忆系统的实现，需依据项目需求进行具体选型与架构设计。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "18a475b1-36ee-48cf-8e61-d74eaf05770f",
+    "label": "轻量持久化",
+    "type": "concept",
+    "summary": "需对轻量持久化进行评估，以适应记忆层的要求，选择合适的技术方案以支持代理编排及系统整体构架。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "label": "Mem0",
+    "type": "tech",
+    "summary": "Mem0 更适合用于语义检索。\nMem0 更适合用于知识图谱。\nMem0 更适合满足多用户记忆需求。\nMem0 与 Memory/Knowledge 存储与检索模型具有较高的契合度\nMem0 与语义检索较为契合\nMem0 与知识图谱较为契合\nMem0 与多用户记忆需求较为契合\nMem0 的推荐路线已被纳入项目文档",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "3d14c676-2da7-4f67-8546-585e5826b8fc",
+    "label": "离线导入/导出能力",
+    "type": "concept",
+    "summary": "离线导入/导出能力将被写入项目文档，技术选型建议将依据项目需求进行。\n离线导入/导出能力与 CLI 集成\n离线导入/导出能力与 MCP 集成",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "71820589-c2ce-4b18-8329-0bda4203b129",
+    "label": "项目文档",
+    "type": "document",
+    "summary": "项目文档需纳入记忆/知识库设计，并包含离线导入/导出能力的技术选型建议，修复附录 B 截断及更新需求。\n记忆/知识库设计被写入并记录在项目文档中\nMem0 的推荐路线已被纳入项目文档",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a9f99ff4-75dd-458d-98d3-bdacb8414aa3",
+    "label": "语义检索",
+    "type": "concept",
+    "summary": "Mem0 更适合用于语义检索。\nMem0 与语义检索较为契合",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "78fb3b99-7de8-4fb7-8bd4-d1ba56c64a60",
+    "label": "知识图谱",
+    "type": "concept",
+    "summary": "Mem0 更适合用于知识图谱。\nMem0 与知识图谱较为契合",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "03996794-02fe-4976-bd16-79f292fa4779",
+    "label": "多用户记忆需求",
+    "type": "concept",
+    "summary": "Mem0 更适合满足多用户记忆需求。\nMem0 与多用户记忆需求较为契合",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "59e99662-c44b-48bb-addb-1f2deb2ff743",
+    "label": "结构化文本存储",
+    "type": "concept",
+    "summary": "MVP 以结构化文本存储为主要存储模式。\n结构化文本存储是该存储与检索模型的一种实现形式",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "5cbd0779-a4b8-4132-a0bf-a31602b15841",
+    "label": "后续迭代",
+    "type": "concept",
+    "summary": "语义向量将留待后续迭代实现。\n蒸馏流程将留待后续迭代实现。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "c0a7f343-91c2-4c0a-868e-b7b6f7592959",
+    "label": "记忆/知识库设计",
+    "type": "concept",
+    "summary": "记忆/知识库设计被写入并记录在项目文档中",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "028df874-7f60-415e-b655-4d1f750caea7",
+    "label": "Letta",
+    "type": "concept",
+    "summary": "User assessed feasibility of implementing memory system storage using two open-source frameworks. MVP currently relies on SQLite text records, with semantic vectors and distillation processes planned for future iterations. Mem0 is preferred for semantic retrieval and multi-user memory needs.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "bfdb5a60-7c6e-46a3-a10e-b6d559291656",
+    "label": "数据包规范",
+    "type": "concept",
+    "summary": "数据包格式说明用于定义数据包规范的格式",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "bbb746d1-d92c-4c50-a897-4935477c7d65",
+    "label": "数据包格式说明",
+    "type": "concept",
+    "summary": "数据包格式说明用于定义数据包规范的格式",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "45610234-239c-4fda-8a0b-f51afd752451",
+    "label": "mvp-plan.md",
+    "type": "document",
+    "summary": "Minusjiang 使用 mvp-plan.md 来明确当前 MVP 的范围、优先级与落地计划。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7da5a785-89ff-471a-9024-9e2ecd83691d",
+    "label": "mvp-todolist.md",
+    "type": "document",
+    "summary": "Minusjiang 使用 mvp-todolist.md 来明确当前 MVP 的范围、优先级与落地计划。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "11785150-6cad-4bdf-b646-304c9e126a3b",
+    "label": "MVP范围",
+    "type": "concept",
+    "summary": "当前MVP已覆盖登录鉴权、数据导入导出、基础可视化等核心功能，但需明确可验收的统一定义。\n将 requirements.md 与 mvp-plan.md、mvp-todolist.md 的内容整合，生成 MVP范围声明、优先级与验收标准\nMVP范围声明包括登录\nMVP范围声明包括数据导入导出\nMVP范围声明包括仪表盘\nMVP范围声明包括活动流\nMVP范围声明包括我的影子\nMVP范围声明定义了端到端用户旅程",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0e9b6b42-fe42-44c5-947f-3ec3af9ca1dd",
+    "label": "MVP优先级",
+    "type": "concept",
+    "summary": "当前能力已基本定型，但需要收敛优先级与目标，以确保各功能模块协调推进。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "196208b1-72c9-45c9-b82b-fd0312bf3c17",
+    "label": "落地计划",
+    "type": "concept",
+    "summary": "基于当前能力，已基本形成落地计划，需进一步串联接口与管理，确保实现端到端用户路径。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "653c04a7-7ed3-4169-b9ca-cd846b4bc9ee",
+    "label": "登录/鉴权",
+    "type": "concept",
+    "summary": "MVP 已覆盖登录/鉴权。\nMVP范围声明包括登录",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "67a6b681-210f-411d-902e-1662d459c143",
+    "label": "数据导入导出",
+    "type": "concept",
+    "summary": "MVP 已覆盖数据导入导出。\nMVP范围声明包括数据导入导出",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "c27afd3d-ef6c-4a5e-b444-45637ebe3654",
+    "label": "仪表盘",
+    "type": "concept",
+    "summary": "MVP 已覆盖基础可视化中的仪表盘。\n前端开发对仪表盘进行了改进\nMVP范围声明包括仪表盘\n像素头像的渲染与交互已集成到仪表盘。\n仪表盘与活动流组件在探索过程中被关联",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "c45a158f-6488-466c-9f85-d6390b43ee89",
+    "label": "活动流",
+    "type": "concept",
+    "summary": "MVP 已覆盖基础可视化中的活动流。\n前端开发对活动流进行了改进\nMVP范围声明包括活动流\n像素头像的渲染与交互已集成到活动流。\n仪表盘与活动流组件在探索过程中被关联",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2081dc76-3175-447e-b106-935643962311",
+    "label": "个人空间",
+    "type": "concept",
+    "summary": "MVP 已覆盖个人空间。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ac26eb75-3cb6-426e-962c-3b46fca1f787",
+    "label": "状态管理",
+    "type": "concept",
+    "summary": "状态管理处于雏形阶段。\n状态管理需要与端到端用户路径整合。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a36bff6b-e397-4e10-b67a-04f8ff7fd209",
+    "label": "端到端用户路径",
+    "type": "concept",
+    "summary": "接口需要与端到端用户路径整合。\n状态管理需要与端到端用户路径整合。\nMVP范围声明定义了端到端用户旅程",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "dfeee422-19f5-4b17-ae96-e3dd1921f493",
+    "label": "命令行界面",
+    "type": "concept",
+    "summary": "CLI 与 Web 关键模块已初步实现并重构\nCLI 对构建配置进行了更新",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "label": "前端开发",
+    "type": "concept",
+    "summary": "前端开发对导航进行了改进\n前端开发对布局进行了改进\n前端开发对仪表盘进行了改进\n前端开发对活动流进行了改进\n前端开发对我的影子页面与组件进行了改进\n前端开发对资料页面与组件进行了改进\n前端开发对项目页面与组件进行了改进\n前端开发对记忆页面与组件进行了改进\n前端开发对前端API契约进行了检查\n前端开发对构建配置进行了检查\nCLI 与 Web 关键模块已初步实现并重构",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "3e2cd149-5545-4607-878e-c7d528d21a8b",
+    "label": "导航",
+    "type": "concept",
+    "summary": "前端开发对导航进行了改进",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9848d66e-8afa-480c-a4be-3a508896aa07",
+    "label": "布局",
+    "type": "concept",
+    "summary": "前端开发对布局进行了改进",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "54d47781-d4a2-4827-8657-7be87ece9301",
+    "label": "我的影子",
+    "type": "concept",
+    "summary": "前端开发对我的影子页面与组件进行了改进\nMVP范围声明包括我的影子",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e3a21254-9fee-4443-a033-5b1706c52b18",
+    "label": "资料",
+    "type": "concept",
+    "summary": "前端开发对资料页面与组件进行了改进",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "label": "项目",
+    "type": "concept",
+    "summary": "前端开发对项目页面与组件进行了改进\nMCP 工具 触发本地项目中的代码搜索\nMCP 的项目搜索接口 需要传入一个 project。\nMCP 搜索接口需要显式提供 project 参数。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "91b55993-c2ee-45c1-b52d-c356c4de4dac",
+    "label": "记忆",
+    "type": "concept",
+    "summary": "前端开发对记忆页面与组件进行了改进",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8c728b01-bfdb-4663-b18e-c1328f88e9c7",
+    "label": "认证",
+    "type": "concept",
+    "summary": "User reviewed and iterated on CLI authentication commands, focusing on login and verification for the MVP.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "3c2302cf-c6c3-442a-b0cc-1d7483b97855",
+    "label": "导入/同步",
+    "type": "concept",
+    "summary": "User examined and refined data import/export commands within the CLI, crucial for the MVP functionality.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b16013c2-1041-421e-a573-a32e9d459d1a",
+    "label": "错误处理",
+    "type": "issue",
+    "summary": "User created a task list to include error handling mechanisms in the MVP development process.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6dd51688-5fb0-4842-a80e-9ca0ccd5bc21",
+    "label": "应用程序编程接口契约",
+    "type": "concept",
+    "summary": "前端开发对前端API契约进行了检查",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f456571b-cef4-4e20-b931-9c625dbe54d9",
+    "label": "构建配置",
+    "type": "concept",
+    "summary": "前端开发对构建配置进行了检查\nCLI 对构建配置进行了更新",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "cbf642b6-bcf4-4761-8dbc-a2d21a70dd65",
+    "label": "空态与加载态",
+    "type": "concept",
+    "summary": "User addressed the need to include empty and loading states in the MVP user interface.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "12edfd90-e747-417d-a99f-23992fa4cf49",
+    "label": "better-sqlite3",
+    "type": "tech",
+    "summary": "本项目将 better-sqlite3 作为 SQLite 的首选驱动并使用。\nbetter-sqlite3 使用内存库，并且内存库中已建表且可查询。\nBetter-sqlite3 被用来访问 SQLite，作为本地的首选方案。\nDrizzle 配置为与 better-sqlite3 搭配使用。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "label": "Drizzle",
+    "type": "concept",
+    "summary": "Drizzle 的 db:push 迁移流程已配置。\nDrizzle 使用 db:push 迁移脚本。\nDrizzle 在 Windows 上进行了兼容性处理。\nDrizzle 的配置为使用 SQLite。\nDrizzle 配置为与 better-sqlite3 搭配使用。\ndrizzle-kit 已锁定版本以确保与 Drizzle 的集成。\ndrizzle-kit 已锁定版本以确保与 Drizzle 的集成。\nDrizzle 使用 db:push 迁移脚本。\nDrizzle 在 Windows 上进行了兼容性处理。\nDrizzle 的配置为使用 SQLite。\nDrizzle 配置为与 better-sqlite3 搭配使用。\ndrizzle-kit 已锁定版本以确保与 Drizzle 的集成。\ndrizzle-kit 已锁定版本以确保与 Drizzle 的集成。\ndrizzle 支持 数据库迁移",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7bd49978-fe17-4e39-a873-3b0e25ce5bc1",
+    "label": "db:push",
+    "type": "concept",
+    "summary": "Drizzle 的 db:push 迁移流程已配置。\nDrizzle 使用 db:push 迁移脚本。\ndb:push 迁移脚本应用于 服务端数据库。\ndrizzle-kit 提供 db:push 命令用于数据库推送\ndb:push 应用于 扩展数据库 schema 的变更\ndrizzle 提供的 db:push 替代 db:generate 命令",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e6bd9329-10b6-4930-8e98-249a38d9147b",
+    "label": "Windows 环境",
+    "type": "concept",
+    "summary": "CLI 在 Windows 环境下运行。\nDrizzle 在 Windows 上进行了兼容性处理。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a6fe9ff6-d2c0-43be-b858-7cfaf1108ca0",
+    "label": "SQLite",
+    "type": "tech",
+    "summary": "Better-sqlite3 被用来访问 SQLite，作为本地的首选方案。\nDrizzle 的配置为使用 SQLite。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "cc7e1fc5-ebb4-40a1-83dc-682af1032297",
+    "label": "表结构",
+    "type": "concept",
+    "summary": "内存数据库 具有 表结构。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "268f51ed-a362-4609-8bee-3614b2310857",
+    "label": "记录量",
+    "type": "concept",
+    "summary": "内存数据库的记录量已成功查询。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "21073a43-670d-41c9-a94d-650aab02b774",
+    "label": "服务端数据库",
+    "type": "concept",
+    "summary": "CLI 可与 服务端数据库 正常工作。\ndb:push 迁移脚本应用于 服务端数据库。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "label": "PowerShell",
+    "type": "concept",
+    "summary": "为避免 Windows 下的 PowerShell 解析问题，建议使用 npx 作为替代方案。\n为避免 Windows 下的 PowerShell 解析问题，亦可使用 终端兼容模式 作为替代。\nPowerShell 不支持使用 '&&' 进行链式命令。\nPowerShell 不支持 '&&' 链式命令，推荐使用 Git Bash 等 Shell。\nPowerShell 使用 && 会导致 Git 命令解析错误。\nPowerShell 使用会触发 Git 命令的解析错误。\nGit 在 PowerShell 上运行\nPowerShell 支持 远程配置",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2dfe5243-be7c-4f53-b791-0a572ab40161",
+    "label": "npx",
+    "type": "concept",
+    "summary": "为避免 Windows 下的 PowerShell 解析问题，建议使用 npx 作为替代方案。\nnpx 与 终端兼容模式可作为 PowerShell 的替代方案之一。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b20fafdf-fb36-4c04-ba15-52f83be50ceb",
+    "label": "终端兼容模式",
+    "type": "concept",
+    "summary": "为避免 Windows 下的 PowerShell 解析问题，亦可使用 终端兼容模式 作为替代。\nnpx 与 终端兼容模式可作为 PowerShell 的替代方案之一。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8913c6ed-cbac-4ffb-9c8c-e0f198e33dee",
+    "label": "代码搜索",
+    "type": "concept",
+    "summary": "User is executing code search within the project using MCP tools but encounters errors. Search requests must include both project and query parameters; missing parameters trigger a 400 error, while the 500 error indicates potential issues with backend services or configuration.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "eb92af3b-2e06-455d-9ce5-d7a00cb5b31f",
+    "label": "Worker API",
+    "type": "tech",
+    "summary": "User attempted multiple project searches using the Worker API. A missing project or query parameter led to a 400 error; after correcting parameters, a 500 error persisted, potentially indicating backend service issues.\nWorker API 需要同时提供有效的 project 作为输入。\nWorker API 需要同时提供有效的 query 作为输入。\n向 Worker API 传入空参数将触发 400 错误。\nMCP 与 Worker API 存在配置或稳定性问题。\nWorker API 需要有效的 project 和 query，空参数会触发 400 错误。\n后端返回 500 错误。\nWorker API 的搜索配置被修复，增加错误处理与重试。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "56bc5efc-048e-41e8-9aa2-f4c955e3cc5a",
+    "label": "搜索接口",
+    "type": "concept",
+    "summary": "搜索接口需要 project 参数\n搜索接口需要 query 参数\n空参数会触发 400 错误\n即便补全参数后仍出现 500 错误",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "c488b957-3c4e-43dc-885d-882178734a12",
+    "label": "项目",
+    "type": "concept",
+    "summary": "搜索接口需要 project 参数\n400 错误因缺少参数 project 而发生\nWorker API 需要同时提供有效的 project 作为输入。\nMCP 对 项目 执行搜索。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "68a40e47-e810-4938-a725-2b5ff779a521",
+    "label": "query",
+    "type": "concept",
+    "summary": "搜索接口需要 query 参数\n400 错误因缺少参数 query 而发生\nMCP 的项目搜索接口 需要传入一个 query。\nWorker API 需要同时提供有效的 query 作为输入。\nMCP 搜索接口需要显式提供 query 参数。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "643479ae-f72c-414c-9897-d84533294e2f",
+    "label": "400 错误",
+    "type": "issue",
+    "summary": "空参数会触发 400 错误\n输入校验防止空查询导致 400 错误\n400 错误因缺少参数 project 而发生\n400 错误因缺少参数 query 而发生\n向 Worker API 传入空参数将触发 400 错误。\nWorker API 需要有效的 project 和 query，空参数会触发 400 错误。\nMCP 搜索缺少必需的 project 与 query 参数，导致 HTTP 400 错误。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0eae9ade-7d09-4dea-ba72-3ae166833b93",
+    "label": "500 错误",
+    "type": "issue",
+    "summary": "即便补全参数后仍出现 500 错误\n500 错误疑似由后端服务/索引或配置异常引起\n后端返回 500 错误。\n后端返回 500 错误。\nMCP 搜索缺少必需的 project 与 query 参数，导致 HTTP 500 错误。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "32ae39ab-f486-4624-9c3f-e87359e64abb",
+    "label": "后端服务/索引或配置异常",
+    "type": "issue",
+    "summary": "500 错误疑似由后端服务/索引或配置异常引起",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "4f343480-2635-4cf0-bf64-ab96b86b875c",
+    "label": "日志",
+    "type": "concept",
+    "summary": "日志确认索引状态已完成\nMCP Worker API inspects server logs to locate 500 errors",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7b66ce94-abd6-4801-846f-08c8f678775f",
+    "label": "Worker/MCP 服务",
+    "type": "tech",
+    "summary": "Worker/MCP 服务 触发索引\nMCP Worker 配置搜索服务及索引。\nminusjiang 触发对 MCP Worker 的检查与重启。\nMCP 检查 Worker/MCP 的连接配置是否正常。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ef5b9f26-216f-4bea-bb24-cf0288a25d35",
+    "label": "权限",
+    "type": "concept",
+    "summary": "User checked the permissions and configurations for the MCP tools and ensured that the project was properly indexed.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "1a82ba8e-b7ca-480e-b531-7dbf32a0b901",
+    "label": "索引",
+    "type": "concept",
+    "summary": "Worker/MCP 服务 触发索引\n日志确认索引状态已完成",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f42b870a-0566-4a5e-bed3-115ffca594a5",
+    "label": "输入校验",
+    "type": "concept",
+    "summary": "输入校验防止空查询导致 400 错误",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "031486b0-58bb-4774-b089-8b3227c91a57",
+    "label": "本地代码库",
+    "type": "concept",
+    "summary": "MCP 在本地代码库中执行搜索\nMCP 使用本地代码库来执行关键词/符号搜索。\nMCP 的项目搜索接口 在本地代码库中执行搜索。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f0f930f3-70a1-4084-b2c4-8ebbc811413b",
+    "label": "关键词/符号",
+    "type": "concept",
+    "summary": "MCP 搜索 关键词/符号",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "label": "MCP 的项目搜索接口",
+    "type": "tech",
+    "summary": "MCP 的项目搜索接口 需要传入一个 project。\nMCP 的项目搜索接口 需要传入一个 query。\nMCP 的项目搜索接口 在本地代码库中执行搜索。\nMCP 使用其项目搜索接口。\nMCP initiates a project-internal search\nMCP attempts project search due to interface errors\nUI Enhancement v3 uses project search to collect required information\nMCP 搜索缺少必需的 project 与 query 参数，导致 HTTP 400 错误。\nMCP 搜索缺少必需的 project 与 query 参数，导致 HTTP 500 错误。\nminusjiang 修复了与 MCP 搜索相关的工具链问题。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ed744253-4963-456e-b9e1-027547223ae7",
+    "label": "搜索服务",
+    "type": "concept",
+    "summary": "MCP Worker 配置搜索服务及索引。\nminusjiang 触发对搜索服务的检查与重启。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9c647280-be0f-4961-b52e-f00dde94ec37",
+    "label": "本地搜索工具",
+    "type": "concept",
+    "summary": "minusjiang 将本地搜索工具作为后备方案以应对 MCP 异常。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "label": "UI增强v3",
+    "type": "concept",
+    "summary": "MCP 在本地项目中搜索与 UI增强v3 相关的内容以完善文档。\nMCP 定位与 UI增强v3 相关内容以完善文档。\nUI增强v3 文档已编辑更新。\nminusjiang 负责为 UI Enhancement v3 制定并完善功能规划与待办清单。\nUI Enhancement v3 planning document was updated\nUI Enhancement v3 To-Do List was updated\nUI Enhancement v3 plans improvements for Recent Activity\nUI Enhancement v3 plans improvements for Memory Sync\nUI Enhancement v3 plans improvements for Shadow Card 视图\nUI Enhancement v3 uses project search to collect required information",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "label": "本地项目",
+    "type": "concept",
+    "summary": "MCP 在本地项目中执行搜索。\nUI Enhancement v3 是本地项目的一部分。\n本地项目 拥有一个 Git 仓库。\nminusjiang 在本地项目上工作。\n本地项目将与指定的 GitHub 仓库建立关联并推送代码。\n本地项目已推送至指定的 GitHub 仓库。\n本地项目涉及仓库初始化。\nminusjiang 将本地项目初始化为 Git 仓库\n单仓项目为记忆/活动系统提供中文摘要支持\n单仓项目为记忆/活动系统增加中文摘要支持\n在单仓项目中为记忆/活动系统加入中文摘要支持",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7522170b-d56b-4de2-98ad-c9412d0db2b8",
+    "label": "本地索引",
+    "type": "concept",
+    "summary": "备用检索方案集成本地索引。\nMCP uses local index/grep as a fallback",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e16e4026-fd4c-4d1f-8cbe-ae02351df254",
+    "label": "简单全文搜索",
+    "type": "concept",
+    "summary": "备用检索方案集成简单全文搜索。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0bc783ff-d65a-45c4-8528-f56cc287a1cf",
+    "label": "备用检索方案",
+    "type": "concept",
+    "summary": "备用检索方案集成本地索引。\n备用检索方案集成简单全文搜索。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8b40ddc6-3433-44c8-82d8-fe930405f6cc",
+    "label": "参数",
+    "type": "concept",
+    "summary": "MCP 使用搜索调用的参数并进行校验。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6ab743fb-bbdc-4754-bbbf-5d40ab68b385",
+    "label": "配置",
+    "type": "concept",
+    "summary": "MCP 更新了搜索配置以支持参数传递及错误处理与重试。\nWorker API 的搜索配置被修复，增加错误处理与重试。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f435c34f-0e45-4210-b757-27903511baba",
+    "label": "故障现象",
+    "type": "concept",
+    "summary": "定位到MCP搜索调用返回400和500错误的故障现象，400错误因缺少必要参数，500错误疑似后端服务/索引或配置异常。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6c2e4e37-8b86-41de-9163-37b027c1be21",
+    "label": "稳定性",
+    "type": "concept",
+    "summary": "MCP/Worker的稳定性存在问题，即使提供有效参数，后端仍返回500，提示服务或配置不稳定。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7f532c51-ee5a-4aff-9474-765819cf6440",
+    "label": "结构与内容",
+    "type": "concept",
+    "summary": "对UI增强v3文档进行了编辑更新，确保结构与内容合理，支持文档的完善工作。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "36b7f752-f88f-4e59-bc05-450f039d4495",
+    "label": "Recent Activity",
+    "type": "concept",
+    "summary": "UI Enhancement v3 plans improvements for Recent Activity",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b5b1a659-2a3f-41de-afe3-236dfc707dc2",
+    "label": "记忆同步",
+    "type": "concept",
+    "summary": "UI Enhancement v3 plans improvements for Memory Sync",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "32596993-8bef-40cc-b15f-ce614aebedeb",
+    "label": "Shadow Card 视图",
+    "type": "tech",
+    "summary": "UI Enhancement v3 plans improvements for Shadow Card 视图\n像素头像组件已与 ShadowCard 前端组件集成。\nminusjiang 增强 ShadowCard",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "470435ea-3923-41b7-8ff7-02c427079713",
+    "label": "UI Enhancement v3 规划文档",
+    "type": "document",
+    "summary": "UI Enhancement v3 planning document was updated\nminusjiang 支持并推进本地项目中的 UI Enhancement v3。\nUI Enhancement v3 是本地项目的一部分。\nminusjiang 在本地项目上协助推进 UI Enhancement v3。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9c856a39-1d02-4c39-858b-fe3acc988d38",
+    "label": "待办清单",
+    "type": "concept",
+    "summary": "UI Enhancement v3 To-Do List was updated",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "465f842b-3b6b-4372-85fd-4f4ab1b6eaac",
+    "label": "MCP Worker API",
+    "type": "tech",
+    "summary": "MCP Worker API inspects server logs to locate 500 errors",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2007d1b2-0729-4ca8-b39a-1899a4ea20ab",
+    "label": "Git 初始化",
+    "type": "tech",
+    "summary": "minusjiang 修复了与 Git 初始化相关的工具链问题。\n本地项目涉及仓库初始化。\n仓库初始化包含首次提交。\n仓库初始化涉及远程配置并推送主分支。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "53c8b9d3-6120-4cc4-a69b-26a514ef3647",
+    "label": "&&",
+    "type": "concept",
+    "summary": "PowerShell 不支持使用 '&&' 进行链式命令。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9dac694e-a42a-4ac2-b7b6-82069aeeb396",
+    "label": "当前目录",
+    "type": "concept",
+    "summary": "当前目录不是 Git 仓库。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ee5834b9-f2cb-4001-89e6-911958143531",
+    "label": "Git 仓库",
+    "type": "tech",
+    "summary": "当前目录不是 Git 仓库。\n本地项目 拥有一个 Git 仓库。\nminusjiang 将本地项目初始化为本地 Git 仓库\n本地 Git 仓库被推送至远程 GitHub 仓库",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a895b1c3-d2df-478d-b805-0b899def10a9",
+    "label": "工具链问题",
+    "type": "issue",
+    "summary": "MCP搜索调用缺少必需的project与query参数导致400/500错误，影响本地项目的UI Enhancement v3。当前目录不是Git仓库，且PowerShell不支持链式命令。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "fb65200a-f34b-42d2-bbe6-8454665b6087",
+    "label": "开发流程",
+    "type": "concept",
+    "summary": "minusjiang 改善了开发流程。\n对前后端 UI 的改进提升了开发流程",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "871e7e30-c88f-43ca-8192-6444e7035d51",
+    "label": "Git Bash",
+    "type": "tech",
+    "summary": "Git Bash 与 Git 配合使用。\nPowerShell 不支持 '&&' 链式命令，推荐使用 Git Bash 等 Shell。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e42c40fd-a78c-4d85-a40c-2076feac59db",
+    "label": "MCP 搜索",
+    "type": "tech",
+    "summary": "MCP 执行 MCP 搜索。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "3f1afddd-5ba4-48d4-9896-964165134221",
+    "label": "首次提交",
+    "type": "concept",
+    "summary": "Git 执行了首次提交。\n仓库初始化包含首次提交。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7aa6158c-2014-44f6-be0e-f419f639bd13",
+    "label": "GitHub",
+    "type": "tech",
+    "summary": "User associated and pushed the local project to a specific GitHub repository. Encountered parsing errors in PowerShell due to using '&&' for Git commands and the GitHub CLI required manual configuration of remote.\n本地项目已推送至指定的 GitHub 仓库。\n主分支已推送到指定的 GitHub 仓库。\n本地项目已推送至指定的 GitHub 仓库。\n主分支已推送到指定的 GitHub 仓库。\n本地 Git 仓库被推送至远程 GitHub 仓库\n缺少 gh 时需手动创建远程后再向远程 GitHub 仓库推送\n本地 Git 仓库被推送至远程 GitHub 仓库\n缺少 gh 时需手动创建远程后再向远程 GitHub 仓库推送\nminusjiang 将本地项目推送至 GitHub",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "684782d1-35fc-4d89-9198-1e63a2add5a6",
+    "label": "User Interface",
+    "type": "concept",
+    "summary": "User developed and refined the feature planning and task list for 'UI Enhancement v3', gathering necessary information through project searches, although faced issues with MCP Worker API resulting in 400 and 500 errors.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "bee1f5a6-728c-4f72-9187-6dd5eab20d56",
+    "label": "GitHub CLI",
+    "type": "tech",
+    "summary": "User encountered issues with GitHub CLI missing configuration, requiring manual setup for remote while managing project push.\ngh CLI 缺失，需要手动配置远程。\n缺少 gh 时需手动创建远程后再向远程 GitHub 仓库推送",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a62dd802-c536-4bff-821d-1f8bb62a531a",
+    "label": "drizzle-kit",
+    "type": "concept",
+    "summary": "User successfully executed the push operation with drizzle-kit after addressing missing generate scripts in the database.\ndrizzle-kit 可以执行数据库脚本。\n数据库生成命令 db:generate 缺失，由 drizzle-kit 数据库迁移工具替代\ndrizzle-kit 提供 db:push 命令用于数据库推送\n数据库生成命令 db:generate 缺失，由 drizzle-kit 数据库迁移工具替代\ndrizzle-kit 提供 db:push 命令用于数据库推送",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "26fecf18-0679-4019-8e89-f712e6dc0980",
+    "label": "数据库脚本",
+    "type": "document",
+    "summary": "User's database scripts were missing the generate function, impacting the push operations. Resolved by utilizing drizzle-kit for successful execution.\n数据库生成脚本在脚本执行方式中缺少 generate 功能。\n数据库生成脚本在脚本执行方式中缺少 generate 功能。\ndrizzle-kit 可以执行数据库脚本。\n数据库生成脚本是自动化流程的一部分。\n数据库迁移脚本是自动化流程的一部分。\n数据库生成脚本在脚本执行方式中缺少 generate 功能。\n数据库生成脚本在脚本执行方式中缺少 generate 功能。\ndrizzle-kit 可以执行数据库脚本。\n数据库生成脚本是自动化流程的一部分。\n数据库迁移脚本是自动化流程的一部分。\n数据库生成脚本在脚本执行方式中缺少 generate 功能。\n数据库生成脚本在脚本执行方式中缺少 generate 功能。\ndrizzle-kit 可以执行数据库脚本。\n数据库生成脚本是自动化流程的一部分。\n数据库迁移脚本是自动化流程的一部分。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "4d3b68ee-29a2-4aa9-8e4d-a772bb4351b6",
+    "label": "GitHub 仓库",
+    "type": "tech",
+    "summary": "本地项目将与指定的 GitHub 仓库建立关联并推送代码。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6a423701-7920-4f5e-85af-3a67393defda",
+    "label": "远程推送流程",
+    "type": "concept",
+    "summary": "仓库初始化涉及远程配置并推送主分支。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e1083b07-b33b-4198-91ea-a3b5574461b1",
+    "label": "像素头像",
+    "type": "concept",
+    "summary": "像素头像的渲染与交互已集成到活动流。\n像素头像的渲染与交互已集成到仪表盘。\n像素头像组件已与 ShadowCard 前端组件集成。\n像素头像组件 与 像素头像 集成\n新增像素头像与卡片 UI，构成 UI 改进的一部分",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0f9f2b69-581e-45c1-876d-499790459a51",
+    "label": "自动化流程",
+    "type": "concept",
+    "summary": "数据库生成脚本是自动化流程的一部分。\n数据库迁移脚本是自动化流程的一部分。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "09b94812-b91d-487f-b136-3783e894d331",
+    "label": "远程配置",
+    "type": "concept",
+    "summary": "gh CLI 缺失，需要手动配置远程。\nPowerShell 支持 远程配置\n完成 Git 远程配置",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "4a5663bf-6b53-4217-8384-f251f145e375",
+    "label": "主分支",
+    "type": "concept",
+    "summary": "主分支已推送到指定的 GitHub 仓库。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "78a24635-d489-42ee-b02e-bae670a411da",
+    "label": "测试",
+    "type": "concept",
+    "summary": "User utilized MCP tool to execute code search in the local project, analyzing errors due to missing parameters. Searches failed with HTTP 400/500 responses. MCP search configuration and parameters were updated to ensure compliance and support for UI Enhancement v3 documentation.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8976c0fe-11a1-4b1f-9918-6629752a64f8",
+    "label": "数据库迁移",
+    "type": "concept",
+    "summary": "Fixed database migration by replacing missing db:generate command with drizzle-kit db:push. Verified and validated migration automation processes.\ndrizzle 支持 数据库迁移",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0cfb272a-0b0d-4983-8001-12c5daa86c82",
+    "label": "内存处理流水线",
+    "type": "concept",
+    "summary": "Improved memory processing pipeline as part of the UI Enhancement v3 project, ensuring better integration with the front-end components.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "77b7adf1-2e99-4b2e-8fe3-3d7f6228b408",
+    "label": "摘要处理流水线",
+    "type": "concept",
+    "summary": "Enhanced summary processing pipeline while addressing issues in the UI Enhancement v3 development for better data handling.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "72d5c587-9371-45a9-9e9f-a044c28aebd6",
+    "label": "前端用户界面组件",
+    "type": "concept",
+    "summary": "Developed and refined front-end UI components as part of UI Enhancement v3, including pixel avatar rendering and interaction enhancements.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "5c6dc924-143a-49e8-a419-e6f39c43204d",
+    "label": "数据库生成命令 db:generate",
+    "type": "concept",
+    "summary": "数据库生成命令 db:generate 缺失，由 drizzle-kit 数据库迁移工具替代\nCI 已与 db:generate 自动化集成\ndrizzle 提供的 db:push 替代 db:generate 命令",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e736906b-c3f7-4a11-a105-cb764ba6122d",
+    "label": "后端 dashboard/summary/memory 服务",
+    "type": "concept",
+    "summary": "后端服务负责生成和推送摘要，并处理内存管理。已优化将 db:generate 脚本与迁移接入自动化，增强了活动流、卡片与 ShadowCard 的渲染与动画。引入 Mock LLM以支持联调，准备替换为真实的 LLM，增加端到端测试与 CI。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e30f74b0-59e7-4ef4-81c0-ab9dd5711de3",
+    "label": "前端 UI 组件",
+    "type": "concept",
+    "summary": "minusjiang 改善 前端 UI 组件\n图标/字体 将整合进 组件库\n主题变量 将整合进 组件库",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "3f30766f-be17-4a3a-9c02-8a959664ebef",
+    "label": "前端活动流",
+    "type": "concept",
+    "summary": "minusjiang 增强 前端活动流",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9b4aeed4-4f7c-4627-a060-9b48c354c14d",
+    "label": "卡片",
+    "type": "concept",
+    "summary": "minusjiang 增强 卡片\n新增像素头像与卡片 UI，构成 UI 改进的一部分",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "5ffd6aa1-e360-4c31-aa9e-3dace3d98100",
+    "label": "像素头像组件",
+    "type": "concept",
+    "summary": "像素头像组件 与 像素头像 集成",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b6f9dfb0-f5b4-4b9b-a20b-9eb7ca1ff11f",
+    "label": "Mock LLM",
+    "type": "tech",
+    "summary": "真实 LLM 将替代 Mock LLM\n流水线包含 Mock LLM 成分以支持摘要/活动流相关功能\n将 Mock LLM 换成真实模型以提升摘要/活动流的测试与监控",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "88aa82cd-e516-4074-bdd9-3cdbd20fbb5a",
+    "label": "真实 LLM",
+    "type": "tech",
+    "summary": "真实 LLM 将替代 Mock LLM",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a6b2df70-f2b9-4e41-8665-a7c908badd1b",
+    "label": "端到端测试",
+    "type": "concept",
+    "summary": "CI 与 端到端测试 集成",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e8c5f5ce-63ab-4c8e-9e37-391e2df22510",
+    "label": "CI",
+    "type": "concept",
+    "summary": "CI 与 端到端测试 集成\nCI 已与 db:generate 自动化集成\nCI 与 Pre-commit 现在包含 TypeScript 与构建检查，以防止导出缺失和类型回归。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8835ddfe-6dc1-4f2a-856e-619573a93c37",
+    "label": "扩展数据库 schema",
+    "type": "concept",
+    "summary": "db:push 应用于 扩展数据库 schema 的变更\n对中文摘要的支持扩展了 schema 的能力",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "4cd8f2ed-f23b-421b-baa1-b63981f842b4",
+    "label": "中文摘要支持",
+    "type": "concept",
+    "summary": "单仓项目为记忆/活动系统提供中文摘要支持\n记忆/活动系统拥有中文摘要支持这一特性\n对中文摘要的支持扩展了 schema 的能力",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "41b2d327-ae72-485b-b9ed-9a906f0ed5fe",
+    "label": "生成与回填流程",
+    "type": "concept",
+    "summary": "在单仓项目中为记忆/活动系统加入中文摘要支持，成功打通生成与回填流程，回填脚本批量生成中文摘要，证明管道可用。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6b141292-ab70-4fc9-be26-140c4baabda0",
+    "label": "前后端 UI",
+    "type": "concept",
+    "summary": "对前后端 UI 的改进提升了开发流程",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "51cbf455-36e8-4f83-af5e-0db2f2e11de3",
+    "label": "回填脚本",
+    "type": "document",
+    "summary": "回填脚本生成中文摘要\n回填脚本成功批量生成约100条中文摘要",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "7bbf706e-e7c6-4f17-8561-3247279d5fb2",
+    "label": "中文摘要",
+    "type": "concept",
+    "summary": "回填脚本生成中文摘要",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "5f6a1a86-0d82-401a-8dc9-767e2dd6feda",
+    "label": "数据库模型",
+    "type": "concept",
+    "summary": "数据库模型与摘要/记忆服务相关联，形成数据支撑",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2fd0a688-d23f-495c-9638-d079c473dc86",
+    "label": "摘要/记忆服务",
+    "type": "concept",
+    "summary": "数据库模型与摘要/记忆服务相关联，形成数据支撑",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "96f6b72c-6c21-48b0-9f63-3aa64e3ec619",
+    "label": "本地开发/推送流程",
+    "type": "concept",
+    "summary": "本地双端口开发是本地开发/推送流程的一部分",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6583f3c9-0322-49d4-b674-3b7ba1e1d012",
+    "label": "首推",
+    "type": "concept",
+    "summary": "完成本地开发/推送流程的首推",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a5173313-6f0d-48a2-83aa-eca7970400b2",
+    "label": "真实模型",
+    "type": "concept",
+    "summary": "将 Mock LLM 换成真实模型以提升摘要/活动流的测试与监控",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "f6bc5768-e910-4aac-99b5-71589fa67eb4",
+    "label": "测试与监控",
+    "type": "concept",
+    "summary": "User implemented testing and monitoring for the memory/activity system, integrating Chinese summary support and optimizing both frontend and backend development processes. Completed Git remote configuration and enhanced the workflow.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "be501bd8-005a-4673-b4a3-a0e7bd87e7f5",
+    "label": "本地双端口开发",
+    "type": "concept",
+    "summary": "本地双端口开发是本地开发/推送流程的一部分",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b22cdc61-2d4e-4abe-95d2-f9c7ae0d4b34",
+    "label": "约100条中文摘要",
+    "type": "concept",
+    "summary": "回填脚本成功批量生成约100条中文摘要",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "a4ce191a-4abb-40f4-b9a0-ebaf4becee54",
+    "label": "流水线",
+    "type": "concept",
+    "summary": "流水线包含 Mock LLM 成分以支持摘要/活动流相关功能",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "59c29e50-af7f-47b2-8a9e-c4d53013c714",
+    "label": "codebuddy-mem",
+    "type": "concept",
+    "summary": "codebuddy-mem 将与统一 LLM 客户端一起集成进 shadow-person 单体仓库",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "01b6cfca-ed0c-4d41-a763-5ce35ec725ee",
+    "label": "统一 LLM 客户端",
+    "type": "tech",
+    "summary": "统一 LLM 客户端 将被集成到 shadow-person 单体仓库中，与 codebuddy-mem 一同实现集成",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "cbbda6da-a193-4ba9-b2cb-0533bb915165",
+    "label": "shadow-person 单体仓库",
+    "type": "tech",
+    "summary": "codebuddy-mem 将与统一 LLM 客户端一起集成进 shadow-person 单体仓库\n统一 LLM 客户端 将被集成到 shadow-person 单体仓库中，与 codebuddy-mem 一同实现集成\n整体方案旨在将 codebuddy-mem 与统一 LLM 客户端集成进 shadow-person 单体仓库\n实施步骤用于实现将 codebuddy-mem 与统一 LLM 客户端集成进 shadow-person 单体仓库",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9a3fbbb2-2c87-40b5-8844-de19c8f06cd3",
+    "label": "整体方案",
+    "type": "concept",
+    "summary": "整体方案旨在将 codebuddy-mem 与统一 LLM 客户端集成进 shadow-person 单体仓库",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "11e80c2b-98e9-46b9-8ee1-5ff8354f2179",
+    "label": "实施步骤",
+    "type": "concept",
+    "summary": "实施步骤用于实现将 codebuddy-mem 与统一 LLM 客户端集成进 shadow-person 单体仓库\nminusjiang 请求 一份 针对 基于 HTML5 Canvas 的 赛博朋克霓虹像素风仪表盘 UI 的实现步骤。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e62f8b19-5774-43af-af02-7db26041e341",
+    "label": "统一客户端抽象",
+    "type": "concept",
+    "summary": "通过统一客户端抽象与共享内存服务可减少重复逻辑并提升一致性",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "cd28d68c-147c-433b-83b3-863cf6bf9a14",
+    "label": "共享内存服务",
+    "type": "concept",
+    "summary": "通过统一客户端抽象与共享内存服务可减少重复逻辑并提升一致性",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "87ee2f82-98f1-4657-a1d5-ff963f2d9355",
+    "label": "重复逻辑",
+    "type": "concept",
+    "summary": "Integrating codebuddy-mem with the unified LLM client into the shadow-person monorepo will reduce redundant logic and enhance consistency.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "4c8eb714-30ef-4a8d-bda3-0a6db67a9c48",
+    "label": "一致性",
+    "type": "concept",
+    "summary": "The integration of codebuddy-mem with a unified LLM client is aimed at improving consistency by reducing redundant logic through shared memory services.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e1d248de-b36c-4e81-8105-2b831c46a91e",
+    "label": "事件流",
+    "type": "concept",
+    "summary": "A comprehensive plan and implementation steps for integrating codebuddy-mem with the unified LLM client in shadow-person monorepo include clarifying event flow.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "8ddba4a9-992d-4460-81d1-f01abe9068e9",
+    "label": "缓存策略",
+    "type": "concept",
+    "summary": "The project plan emphasizes the need for clear cache strategies to avoid cross-module coupling and data inconsistencies.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "b173123a-d9ca-42da-9990-79a7f036548a",
+    "label": "跨模块耦合",
+    "type": "concept",
+    "summary": "To prevent cross-module coupling, the integration plan stresses the importance of defining event flow and cache strategies, enhancing system architecture.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "af00b50f-fc26-4ce0-af31-389e7968d525",
+    "label": "数据不一致",
+    "type": "concept",
+    "summary": "The implementation strategy aims to mitigate data inconsistency through unified client abstraction and shared memory services.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "aacd399a-8422-4755-8609-6fb825088ba5",
+    "label": "Vite",
+    "type": "concept",
+    "summary": "minusjiang 修复了由 Vite 报告的前端构建与类型错误，使本地开发服务器成功启动\nVite 报告 StationCanvas 缺少导出和 TS 类型不匹配",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9e4391dd-ff6d-4bed-be9b-444a6c352c00",
+    "label": "StationCanvas",
+    "type": "concept",
+    "summary": "Vite 报告 StationCanvas 缺少导出和 TS 类型不匹配\nStationCanvas 的命名导出与导入不一致，且布局相关存在类型不匹配，tiles 应为 TileType[]\nMinusjiang identified and fixes the missing named export for StationCanvas, enabling the frontend build.\n对 StationCanvas 的修改使本地开发服务器能够成功启动。\nStationCanvas 的变动促使 OfficeLayout 的类型签名对齐 StationCanvas 的导出。\nTypeScript 针对 StationCanvas 的相关代码执行了类型检查以定位不匹配。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "c4157125-606e-461e-a2d5-0173ce9e7670",
+    "label": "TileType",
+    "type": "concept",
+    "summary": "StationCanvas 的命名导出与导入不一致，且布局相关存在类型不匹配，tiles 应为 TileType[]",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0adcdd8a-64ed-4b8c-8e82-cdfeb3e43457",
+    "label": "本地开发服务器",
+    "type": "concept",
+    "summary": "User fixed frontend build and type errors in the local development server, resolving issues with StationCanvas export/import inconsistencies and type mismatches.\n对 StationCanvas 的修改使本地开发服务器能够成功启动。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0ddedd11-7aa2-437a-948e-659dcd5d4f64",
+    "label": "TypeScript",
+    "type": "tech",
+    "summary": "User addressed TypeScript type errors in the frontend, ensuring consistency between expected and actual types during local development.\nTypeScript 针对 StationCanvas 的相关代码执行了类型检查以定位不匹配。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "706404f1-5674-4a33-9ee2-11c361e4c832",
+    "label": "Station",
+    "type": "concept",
+    "summary": "Fixed front-end build errors, including naming exports/imports issues in StationCanvas and TypeScript type mismatches. Local development server was restored after corrections and ensured proper export naming.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "3f0ff195-11c1-4f1a-9f9d-0f7ab1cb22ff",
+    "label": "OfficeLayout",
+    "type": "concept",
+    "summary": "Minusjiang 纠正了 OfficeLayout 的类型签名。\nStationCanvas 的变动促使 OfficeLayout 的类型签名对齐 StationCanvas 的导出。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "79527e9c-e925-40f9-b64f-5cb4141c43ce",
+    "label": "tiles",
+    "type": "concept",
+    "summary": "Minusjiang 纠正了 tiles 的类型签名。\n布局对象的版本字面量与 tiles 的类型不一致。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "00e104a7-40b7-4d7d-9bfc-659ae727f981",
+    "label": "TypeScript Compiler",
+    "type": "tech",
+    "summary": "Identified and resolved TypeScript type errors during the local development build process. Implemented checks in CI to prevent issues related to export omissions and type regressions.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9512a4f8-303c-4cf3-b4b3-80b0c0d1f85c",
+    "label": "Pre-commit",
+    "type": "concept",
+    "summary": "CI 与 Pre-commit 现在包含 TypeScript 与构建检查，以防止导出缺失和类型回归。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "label": "HTML5 Canvas",
+    "type": "concept",
+    "summary": "赛博朋克霓虹像素风仪表盘 UI 基于 HTML5 Canvas。\nHTML5 Canvas 使用 阴影 实现 霓虹发光和像素风的视觉效果。\nHTML5 Canvas 使用 合成 实现 霓虹发光和像素风的视觉效果。\nHTML5 Canvas 采用 分层渲染 提升 性能与 清晰度。\nHTML5 Canvas 使用 requestAnimationFrame。\nHTML5 Canvas 使用 离屏画布。\nHTML5 Canvas 使用 高 DPI 处理。\nHTML5 Canvas 使用 阴影与合成 实现霓虹发光和像素风效果",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ab2b1925-8c7f-485d-9fc8-f4e74af4c8a1",
+    "label": "赛博朋克霓虹像素风仪表盘 UI",
+    "type": "concept",
+    "summary": "赛博朋克霓虹像素风仪表盘 UI 基于 HTML5 Canvas。\nUI 设计规范 定义 赛博朋克霓虹像素风仪表盘 UI 的视觉、布局、组件与动画等规范",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "de5f1952-bae3-4d1c-81f6-6c7e7b77fbe2",
+    "label": "设计规范",
+    "type": "concept",
+    "summary": "minusjiang 请求 一份 针对 基于 HTML5 Canvas 的 赛博朋克霓虹像素风仪表盘 UI 的设计规范。\nUI 设计规范 定义 赛博朋克霓虹像素风仪表盘 UI 的视觉、布局、组件与动画等规范\nUI 设计规范 附带 性能与可维护性建议",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "662c1eeb-798c-4104-a475-4266308df2ab",
+    "label": "阴影",
+    "type": "concept",
+    "summary": "HTML5 Canvas 使用 阴影 实现 霓虹发光和像素风的视觉效果。\n阴影 实现 霓虹发光。\n阴影 实现 像素风。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e3da481b-4694-44a2-b4f4-0feb5b9b7a74",
+    "label": "合成",
+    "type": "concept",
+    "summary": "HTML5 Canvas 使用 合成 实现 霓虹发光和像素风的视觉效果。\n合成 实现 霓虹发光。\n合成 实现 像素风。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "ee4aeead-54f0-45d9-8a97-5c903fb75e98",
+    "label": "霓虹发光",
+    "type": "concept",
+    "summary": "阴影 实现 霓虹发光。\n合成 实现 霓虹发光。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "39a1b938-15a7-476e-8d4f-f3a2653d3370",
+    "label": "像素风",
+    "type": "concept",
+    "summary": "阴影 实现 像素风。\n合成 实现 像素风。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "e19f7487-36fb-48db-8471-df96fa8e0f10",
+    "label": "分层渲染",
+    "type": "concept",
+    "summary": "HTML5 Canvas 采用 分层渲染 提升 性能与 清晰度。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "287d6a91-dbb0-4684-bdd1-541e03dab335",
+    "label": "requestAnimationFrame",
+    "type": "concept",
+    "summary": "HTML5 Canvas 使用 requestAnimationFrame。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9b36428b-2e5d-4c99-a2d0-63c4f4ca2a38",
+    "label": "离屏画布",
+    "type": "concept",
+    "summary": "HTML5 Canvas 使用 离屏画布。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "9970faf5-824d-41cc-9e4c-1ded345271ab",
+    "label": "高 DPI 处理",
+    "type": "concept",
+    "summary": "HTML5 Canvas 使用 高 DPI 处理。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "573b8a56-17ab-463a-af75-2950aaba1770",
+    "label": "阴影与合成",
+    "type": "concept",
+    "summary": "HTML5 Canvas 使用 阴影与合成 实现霓虹发光和像素风效果",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "d0d46dcd-0464-4b86-86b7-ce7935365a11",
+    "label": "Canvas 渲染流程",
+    "type": "concept",
+    "summary": "HTML5 Canvas rendering uses shadows and compositing for neon effects and pixel style. It incorporates layered rendering, requestAnimationFrame, off-screen canvas, and high DPI processing to ensure performance and clarity.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "c097e666-3f4b-494b-a006-3159c28807e9",
+    "label": "交互事件",
+    "type": "concept",
+    "summary": "The UI design provides an implementation guide for interactions in the Canvas interface, focusing on event handling and performance strategies.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "6487f60c-58ee-45b3-86d4-e4a884f50d4b",
+    "label": "图标/字体",
+    "type": "concept",
+    "summary": "图标/字体 将整合进 组件库",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2f0b90aa-ea16-481b-99de-0e9b6275201c",
+    "label": "主题变量",
+    "type": "concept",
+    "summary": "主题变量 将整合进 组件库",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "0d71fd58-16b2-498b-a1de-a374f2640f0b",
+    "label": "性能与可维护性建议",
+    "type": "concept",
+    "summary": "UI 设计规范 附带 性能与可维护性建议",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "74dbbd6a-4eef-47f7-8341-09b459728627",
+    "label": "前端 TypeScript/React 项目",
+    "type": "tech",
+    "summary": "User diagnosed and fixed type errors and component issues in the front-end TypeScript/React project, stabilizing the development environment and advancing UI/UX improvements.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "2271bc81-c575-4c13-8ce0-94a1ac307f95",
+    "label": "UI/UX",
+    "type": "concept",
+    "summary": "推动前端 UI/UX 的改进。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "95104679-81c3-4162-8b1e-d8677026bfcc",
+    "label": "开发环境",
+    "type": "concept",
+    "summary": "对前端 TypeScript/React 项目的问题进行诊断和修复以提升开发环境的稳定性。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "df26fccc-69d0-4b73-bd21-f5187ef30bbb",
+    "label": "布局对象",
+    "type": "concept",
+    "summary": "布局对象的版本字面量与 tiles 的类型不一致。",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  },
+  {
+    "id": "dae6f83e-5bcc-4402-a190-0df8c0db496b",
+    "label": "版本字面量",
+    "type": "concept",
+    "summary": "User identified that the type of version literals was inconsistent with expectations, impacting the layout object in the front-end TypeScript/React project.",
+    "details": {
+      "group_id": "shadowfolk"
+    }
+  }
+];
+const edges = [
+  {
+    "id": "b928561f-8161-44bb-a798-25363ca25c03",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "relation": "PREFERS_USING",
+    "fact": "minusjiang 偏好 使用 CLI 作为首选工具。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-26 15:49:59.620000",
+    "episodes": []
+  },
+  {
+    "id": "bb25f00e-7844-4075-a5b4-6c8a57a52ddd",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "relation": "INCLUDES",
+    "fact": "MVP 应包含 CLI 数据推送能力。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5d9e6fbd-d7f9-4245-a514-029ff41541b2",
+    "source": "3d14c676-2da7-4f67-8546-585e5826b8fc",
+    "target": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "relation": "INTEGRATED_WITH",
+    "fact": "离线导入/导出能力与 CLI 集成",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0f6a2a8a-b5c9-4c91-975b-7efff8bd4460",
+    "source": "3d14c676-2da7-4f67-8546-585e5826b8fc",
+    "target": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "relation": "INTEGRATED_WITH",
+    "fact": "离线导入/导出能力与 MCP 集成",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6ffcb189-45c7-4b82-8dbd-333bd4f39d2f",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "relation": "USES",
+    "fact": "minusjiang 指示通过 MCP 在本地代码库中搜索关键词/符号以定位相关代码。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "d04ea521-7682-413a-aba8-e7ca15f468d2",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "relation": "USES",
+    "fact": "minusjiang 使用 MCP 的项目搜索来收集实现 UI Enhancement v3 所需的信息。",
+    "valid_at": "2026-02-27 08:08:36.610000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "f5e591f2-c9dc-4c67-8390-a3a71e995057",
+    "source": "0af6d4ba-2dc3-483f-9ff4-3de9f0a42cdb",
+    "target": "da59d92e-0428-40aa-8285-227cfc0f5a9b",
+    "relation": "UPLOADED_TO",
+    "fact": "本地开发分支的分支名上传到 Shadow。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "75fb5a27-ce98-4ab4-a42f-e25d48043300",
+    "source": "da59d92e-0428-40aa-8285-227cfc0f5a9b",
+    "target": "da59d92e-0428-40aa-8285-227cfc0f5a9b",
+    "relation": "RENAMED_TO",
+    "fact": "仅在作为项目/系统名称的场景将 ShadowPerson 重命名为 ShadowFolk，且保留组件/概念名不变。",
+    "valid_at": "2026-02-26 16:29:42.376000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e2cf10b8-490b-4179-84de-6bbed1c93f8f",
+    "source": "12edfd90-e747-417d-a99f-23992fa4cf49",
+    "target": "79f59257-3048-4edc-8183-085c22f9d2e1",
+    "relation": "USES_MEMORY_DATABASE",
+    "fact": "better-sqlite3 使用内存库，并且内存库中已建表且可查询。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "37550196-8c25-487d-b5e2-ae24c4991425",
+    "source": "6560c372-6284-4310-a2ce-70fdfb88c828",
+    "target": "79f59257-3048-4edc-8183-085c22f9d2e1",
+    "relation": "HAS_MEMORY_DATABASE",
+    "fact": "SQLite 的内存数据库已建表并可查询。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "443387ad-22f9-4ea3-820e-3fa301adf54f",
+    "source": "53d19121-661b-4199-b057-c3910160c037",
+    "target": "81b47d21-eb29-4eef-8989-f8dc891c74b6",
+    "relation": "FILLED_IN",
+    "fact": "在 Workspace 中填写 姓名。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f2d264a0-e3e2-46b3-9c78-2bbdff50fdc3",
+    "source": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "target": "81b47d21-eb29-4eef-8989-f8dc891c74b6",
+    "relation": "INCLUDES",
+    "fact": "需求文档应纳入 Workspace 概念。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "366fdb12-3b31-4fcb-a0b6-0808d3ea96ee",
+    "source": "81b47d21-eb29-4eef-8989-f8dc891c74b6",
+    "target": "2fd3564b-4930-482a-a5fa-bbdaf309cb94",
+    "relation": "CONFIGURES",
+    "fact": "Workspace 配置 权限。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-26 15:49:59.620000",
+    "episodes": []
+  },
+  {
+    "id": "35ef010a-9a63-4d48-8838-e6f3d5648a81",
+    "source": "81b47d21-eb29-4eef-8989-f8dc891c74b6",
+    "target": "69b101ad-cc41-4435-8e12-9caddc762337",
+    "relation": "STANDARDIZED_WITH",
+    "fact": "Workspace 与 API 模型实现标准化。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-26 16:35:09",
+    "episodes": []
+  },
+  {
+    "id": "ebc9e884-ecff-4e09-902f-2bfa92ccb9da",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "69b101ad-cc41-4435-8e12-9caddc762337",
+    "relation": "UNIFIED_WITH",
+    "fact": "MCP 工具 与 API 描述实现统一。",
+    "valid_at": "2026-02-26 15:49:59.620000",
+    "invalid_at": "2026-02-26 16:35:09",
+    "episodes": []
+  },
+  {
+    "id": "21c48cec-d014-4460-915c-1a1f9e4c6128",
+    "source": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "target": "69b101ad-cc41-4435-8e12-9caddc762337",
+    "relation": "INCLUDES",
+    "fact": "需求文档应纳入 API 面向的描述与扩展。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "78ea927e-ab55-4136-a073-eb71b2c02ce3",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "69b101ad-cc41-4435-8e12-9caddc762337",
+    "relation": "PROTOTYPE_STATUS",
+    "fact": "接口处于雏形阶段。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "057a858b-f817-4954-b2a0-038edee640a9",
+    "source": "81b47d21-eb29-4eef-8989-f8dc891c74b6",
+    "target": "a327cf90-84eb-46af-9e38-432040e8cd9f",
+    "relation": "STANDARDIZED_WITH",
+    "fact": "Workspace 与 AgentSkill 模型实现标准化。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-26 15:49:59.620000",
+    "episodes": []
+  },
+  {
+    "id": "2c72d03c-1646-430a-8257-0c83a69388ad",
+    "source": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "target": "a327cf90-84eb-46af-9e38-432040e8cd9f",
+    "relation": "INCLUDES",
+    "fact": "需求文档应纳入 AgentSkill 概念。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1939ab42-72d7-4a60-843e-6e76fc6e1de1",
+    "source": "81b47d21-eb29-4eef-8989-f8dc891c74b6",
+    "target": "f4a9a1a4-7444-4e84-9b99-6b95fe9e4769",
+    "relation": "STANDARDIZED_WITH",
+    "fact": "Workspace 与 DevStatus 模型实现标准化。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-26 15:49:59.620000",
+    "episodes": []
+  },
+  {
+    "id": "ec19c059-6a53-4afd-973c-a7c9d4c6a0f5",
+    "source": "a327cf90-84eb-46af-9e38-432040e8cd9f",
+    "target": "f4a9a1a4-7444-4e84-9b99-6b95fe9e4769",
+    "relation": "SUPPORTS",
+    "fact": "AgentSkill 支持 DevStatus，用于技能索引与开发进度跟踪。",
+    "valid_at": "2026-02-26 15:49:59.620000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f27904cc-cb80-4b74-9caa-94d9411a1e55",
+    "source": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "target": "f4a9a1a4-7444-4e84-9b99-6b95fe9e4769",
+    "relation": "INCLUDES",
+    "fact": "需求文档应纳入 DevStatus 概念。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "edebcb29-f9d0-445c-9e42-b51adeb47d3e",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "ed562d20-982b-434f-85f4-5d586beb0f83",
+    "relation": "PREFERS_OPTIONAL",
+    "fact": "minusjiang 询问 是否 需要 一个 Web 端。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-26 15:49:59.620000",
+    "episodes": []
+  },
+  {
+    "id": "b4e5be55-2370-4696-afd6-580fa3b6d8d1",
+    "source": "28e30285-f6a7-4bef-b11e-b97e689a3ed9",
+    "target": "9f6fb585-f3f4-4732-9dd4-eeda969b2951",
+    "relation": "VISUALIZES_ACTIVITY",
+    "fact": "服务器 将 对 各人员的活动 进行可视化查看。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "dfe949a9-ec6b-418c-8541-7d60a9b882a8",
+    "source": "39769733-b123-4c52-bf87-866fc5553220",
+    "target": "8a324b25-75d6-4ad3-9634-6d296b31b58c",
+    "relation": "UPGRADES",
+    "fact": "版本 v3.0 将对附录 B 进行升级，并修复截断与链接问题。",
+    "valid_at": "2026-02-26 15:49:59.620000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6e2dcd9a-dfd6-436e-ab6e-5f1f544e3978",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "8cdc2cad-7083-42de-9244-fe19b0faf0b3",
+    "relation": "AIMS_TO_UPDATE_DOCUMENT",
+    "fact": "MCP 的搜索旨在完善 文档。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "83ddca19-eb7c-4269-99ed-b3d1808d9a25",
+    "source": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "target": "8cdc2cad-7083-42de-9244-fe19b0faf0b3",
+    "relation": "MODIFIES_DOCUMENT",
+    "fact": "UI增强v3 文档已编辑更新。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "918ff4e1-be2d-4512-a327-a4d9626bef43",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "d03fe084-dc1a-43c9-8e43-82a739ad8844",
+    "relation": "SUPPORTS",
+    "fact": "MCP 支持 分支登记。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "83002a50-1cbd-4df8-a019-a301d48ac5d6",
+    "source": "79f59257-3048-4edc-8183-085c22f9d2e1",
+    "target": "bb805c53-d550-4255-87b9-23c847e170ab",
+    "relation": "UPLOADED_VIA",
+    "fact": "mem 数据库将通过 记忆上传 的流程进行制定与上传。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5b0161e5-fc40-49be-ae75-cc2fb2449bbb",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "bb805c53-d550-4255-87b9-23c847e170ab",
+    "relation": "SUPPORTS",
+    "fact": "MCP 支持 记忆上传。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4aa7f67a-0e45-41cb-8e00-fe7794b90e2d",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "899ae7ff-8ed9-4614-9832-7d72e90c726e",
+    "relation": "SUPPORTS",
+    "fact": "MCP 支持 技能检索。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "8e59b82c-260b-49a9-9668-2c4e706a7c90",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "63101d7c-32e9-4eef-9888-1ad9bd096a39",
+    "relation": "SERVES_AS",
+    "fact": "MCP 将作为统一的远端交互通道。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "328ee315-fca6-43f6-a063-24c68d1f807b",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "335be26a-65af-4a4d-99e6-59c35787e768",
+    "relation": "PARALLEL_IMPLEMENTATION_WITH",
+    "fact": "MVP 将与后端并行落地。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8a965022-f8d4-4c20-8797-c31c1400a25c",
+    "source": "335be26a-65af-4a4d-99e6-59c35787e768",
+    "target": "6cb06fba-2752-454d-87b1-cae2130946e6",
+    "relation": "DESIGNATED_AS",
+    "fact": "后端 被定位为 轻索引。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": "2026-02-27 07:45:07",
+    "episodes": []
+  },
+  {
+    "id": "1035a247-fadb-471b-aff8-29a28bf712f4",
+    "source": "335be26a-65af-4a4d-99e6-59c35787e768",
+    "target": "a61a3de4-538d-4512-8479-6c5d74dedbae",
+    "relation": "DESIGNATED_AS",
+    "fact": "后端 以 重记忆 为定位。",
+    "valid_at": "2026-02-26 15:41:35.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6f5a22a5-5cf6-415a-8efb-3a7e1c398c72",
+    "source": "335be26a-65af-4a4d-99e6-59c35787e768",
+    "target": "a61a3de4-538d-4512-8479-6c5d74dedbae",
+    "relation": "DESCRIBED_AS",
+    "fact": "后端被描述为以重记忆为核心的架构定位（并辅以轻索引）。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e659513f-71b5-47d3-be84-be863fbf0bdb",
+    "source": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "target": "29c672ab-f00b-49d9-a2ba-ad08e78b6fa4",
+    "relation": "REQUIRES",
+    "fact": "CLI 仅靠自身难以满足对 Profile、权限与全局可视化的需求，因此需要构建 Shadow Hub Web 管理端来承载高级管理与可视化。",
+    "valid_at": "2026-02-26 15:49:59.620000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "488aed54-0643-42db-822d-f4a0b1f6227d",
+    "source": "8abbf783-8e1b-4e7b-b980-cb7e41efe2af",
+    "target": "29c672ab-f00b-49d9-a2ba-ad08e78b6fa4",
+    "relation": "PROVIDES_UI_FOR",
+    "fact": "Web 前端 提供 Web 管理界面。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "51f51359-9704-4444-99ef-a1ad569a8cbb",
+    "source": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "target": "29c672ab-f00b-49d9-a2ba-ad08e78b6fa4",
+    "relation": "INCLUDES",
+    "fact": "需求文档应纳入对 Web 管理界面的描述与规范。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e7bb773e-7920-49b2-a65f-91732233767b",
+    "source": "81b47d21-eb29-4eef-8989-f8dc891c74b6",
+    "target": "db73a2ce-fb95-435b-80d5-bf40d69485b2",
+    "relation": "REPLACES",
+    "fact": "Workspace 将替代以 Person 为中心的权限与可见性管理模式。",
+    "valid_at": "2026-02-26 15:49:59.620000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f937f439-1f42-4e87-9687-8514610d6cbe",
+    "source": "da59d92e-0428-40aa-8285-227cfc0f5a9b",
+    "target": "b15c5b3e-20e6-4e9b-a7e4-1e60cf3d34dd",
+    "relation": "HAS_VISUAL_REPRESENTATION",
+    "fact": "Shadow 将以小人形象呈现，用于实现动画与可视化效果。",
+    "valid_at": "2026-02-26 15:49:59.620000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "fd317097-16c2-4c0d-b44c-67c3f575749d",
+    "source": "8a324b25-75d6-4ad3-9634-6d296b31b58c",
+    "target": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "relation": "NEEDS_COMPLETION",
+    "fact": "文档附录 B 需要补全。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "76e2f5a8-2998-45aa-95c4-17202893bbdb",
+    "source": "70e2a616-0c7d-4fac-a19e-f6743dc56e1d",
+    "target": "8abbf783-8e1b-4e7b-b980-cb7e41efe2af",
+    "relation": "ASSOCIATED_WITH",
+    "fact": "Shadow Hub Web 管理端为前端管理界面相关组件。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "aa9d8b9d-c872-4592-aa0c-3aa4531b76f1",
+    "source": "2e4288ed-d271-40ef-a8d4-6f3787a4f6ec",
+    "target": "8abbf783-8e1b-4e7b-b980-cb7e41efe2af",
+    "relation": "DESCRIBED_AS",
+    "fact": "UI 设计可应用于 Web 前端以实现高端界面。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "92b4dace-73f9-4393-9324-6d2df7e30186",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "relation": "LACKS_DEFINITION",
+    "fact": "尚未形成可验收的统一 MVP 定义。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3be0f112-9a75-45ce-8e7b-899735d09a28",
+    "source": "48c901a5-a742-4b10-9333-8a374cac52e1",
+    "target": "eee292d3-2cc9-44cd-8982-3b26d5f6db5f",
+    "relation": "PROVIDES",
+    "fact": "MCP Server 提供 AI 消费接口。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9b7aaa71-a81e-43f0-aa61-77d3d77fcc7c",
+    "source": "335be26a-65af-4a4d-99e6-59c35787e768",
+    "target": "975b31d3-6551-4506-ae79-52f6596f96ae",
+    "relation": "USES",
+    "fact": "后端 使用 REST API 作为接口实现。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "489d2625-d333-4231-a85f-66e60eb40ef3",
+    "source": "335be26a-65af-4a4d-99e6-59c35787e768",
+    "target": "6560c372-6284-4310-a2ce-70fdfb88c828",
+    "relation": "USES",
+    "fact": "后端 使用 数据库 存储数据。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "652c968f-f223-4ded-85ea-cfad1d0c7e89",
+    "source": "89dedc39-8ed9-47fd-b8ec-5e2334127324",
+    "target": "6560c372-6284-4310-a2ce-70fdfb88c828",
+    "relation": "USES",
+    "fact": "MVP 使用 SQLite 数据库作为主存储以保存记录。",
+    "valid_at": "2026-02-26 16:53:49.469000",
+    "invalid_at": "2026-02-27 02:40:21.324000",
+    "episodes": []
+  },
+  {
+    "id": "34de5197-8790-49ad-9f21-8bdd4ddb3e27",
+    "source": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "target": "6560c372-6284-4310-a2ce-70fdfb88c828",
+    "relation": "WORKS_WITH",
+    "fact": "CLI 能与服务端数据库协同工作。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0c8343eb-262b-4e49-a8c4-33147e25b7e8",
+    "source": "192da696-661e-4531-8797-67ddbd12ca73",
+    "target": "b5909883-d9d6-4d6e-979b-0628f536b4c0",
+    "relation": "AFFECTS",
+    "fact": "技术选型需按前后端拆分，并重构目录结构。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8c6193da-0a2c-436e-8772-d40e75febe57",
+    "source": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "target": "b0bb2082-8658-4a8c-80f0-944a5ebab07b",
+    "relation": "INCLUDES",
+    "fact": "需求文档应纳入 工具 内容描述。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d130a269-96c1-4ade-a2fe-13a2d85c1ec5",
+    "source": "8a5bb97e-3ffc-485f-8068-b07d523c5573",
+    "target": "554d71f1-fc11-4dc9-b9cf-1c52c8d997a2",
+    "relation": "INCLUDES",
+    "fact": "需求文档应纳入 阶段路线图。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "328ab896-6d4b-4571-9ba2-376b19b13395",
+    "source": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "target": "12cc350f-95a3-4146-800b-529ab9106762",
+    "relation": "ACTS_AS",
+    "fact": "CLI 充当数据管道的角色。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6042bef9-d071-43d9-9b28-24755bb085c0",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "104ee4e6-0d48-4d63-a037-1e7416dfd7bf",
+    "relation": "USES",
+    "fact": "Minusjiang 使用 requirements.md 来明确当前 MVP 的范围、优先级与落地计划。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9241dfed-1b02-470b-87e5-d3c418da256f",
+    "source": "ec1870d3-c91d-43cf-a604-a4124f9ad10e",
+    "target": "b4d8db02-690f-486d-a258-530a10f45e77",
+    "relation": "DESCRIBES_ENCODING_ISSUES",
+    "fact": "design-intent-and-scenarios.md 存在广泛的 UTF-8 中文乱码。",
+    "valid_at": "2026-02-26 16:35:09",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ad4b69ca-f5e0-4083-a223-59ab5ff6a093",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "7150c979-363e-45db-b0c5-855492c92b3a",
+    "relation": "INVOLVES",
+    "fact": "MCP 搜索相关的问题涉及 Git 初始化。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9fc93abd-5ff1-42c2-8038-44c0d70645e8",
+    "source": "871e7e30-c88f-43ca-8192-6444e7035d51",
+    "target": "7150c979-363e-45db-b0c5-855492c92b3a",
+    "relation": "USES",
+    "fact": "Git Bash 与 Git 配合使用。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "19400e74-3e0f-4edc-831e-d9f2ebddea97",
+    "source": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "target": "7150c979-363e-45db-b0c5-855492c92b3a",
+    "relation": "CAUSES_PARSE_ERROR",
+    "fact": "PowerShell 使用 && 会导致 Git 命令解析错误。",
+    "valid_at": "2026-02-27 08:29:45.495000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "521ae9b5-66db-4762-8a08-d2c78259f340",
+    "source": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "target": "7150c979-363e-45db-b0c5-855492c92b3a",
+    "relation": "CAUSES_PARSE_ERROR_WITH",
+    "fact": "PowerShell 使用会触发 Git 命令的解析错误。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "dd5b7178-bf50-4d10-b845-f6dde07d9a6e",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "f64b07f4-f8c1-4b95-a467-a2d9ec349f1a",
+    "relation": "DESCRIBES_FORM_OF",
+    "fact": "mvp-plan.md 描述了知识库的存在形式。",
+    "valid_at": "2026-02-26 16:35:09",
+    "invalid_at": "2026-02-26 16:53:49.469000",
+    "episodes": []
+  },
+  {
+    "id": "f978d943-6640-4420-a8cb-5fbfb761e220",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "995f2d9b-2ee7-4ba7-aed6-5c31ff5520ae",
+    "relation": "DESCRIBES_FORM_OF",
+    "fact": "mvp-plan.md 描述了 memory 的存在形式。",
+    "valid_at": "2026-02-26 16:35:09",
+    "invalid_at": "2026-02-26 16:53:49.469000",
+    "episodes": []
+  },
+  {
+    "id": "44965314-fd3e-4c40-8585-51c2d8515b8e",
+    "source": "104ee4e6-0d48-4d63-a037-1e7416dfd7bf",
+    "target": "e470e950-5e39-4731-8b31-38c219874926",
+    "relation": "LACKS_OPEN_SOURCE_RECOMMENDATIONS",
+    "fact": "requirements.md 未包含明确的开源仓库推荐列表，需扩大检索范围。",
+    "valid_at": "2026-02-26 16:35:09",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5e60977b-7b0a-4b08-bde2-b016c194f9b4",
+    "source": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "target": "bf9c285f-41f8-4c19-8195-db26018543bc",
+    "relation": "COMPATIBLE_WITH",
+    "fact": "Mem0 与 Memory/Knowledge 存储与检索模型具有较高的契合度",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "614ff493-fe56-49e5-aaff-80d11a4a1ad4",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "bf9c285f-41f8-4c19-8195-db26018543bc",
+    "relation": "DESCRIBED_AS",
+    "fact": "MVP 的 Memory/Knowledge 存储与检索模型被梳理",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0d881a6d-3286-445c-a62c-d2b65026410e",
+    "source": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "target": "eb3cdb03-c0f9-4e24-8bb9-4383d352351f",
+    "relation": "ADDS_FEATURE_TO",
+    "fact": "单仓项目为记忆/活动系统增加中文摘要支持",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8ba1ddc0-ee65-494f-91c3-e25fe4abe057",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "eb3cdb03-c0f9-4e24-8bb9-4383d352351f",
+    "relation": "ENHANCES",
+    "fact": "通过提供中文摘要支持增强记忆/活动系统",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e1273161-6994-46aa-abee-c4dcbdade0ff",
+    "source": "89dedc39-8ed9-47fd-b8ec-5e2334127324",
+    "target": "ed89dfe7-b56e-4766-b3c4-61de43417363",
+    "relation": "NOT_YET_IMPLEMENTED",
+    "fact": "MVP 尚未落地实现语义向量。",
+    "valid_at": "2026-02-26 16:53:49.469000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "afd874ea-a3be-45f1-bb86-133b24ecd34a",
+    "source": "89dedc39-8ed9-47fd-b8ec-5e2334127324",
+    "target": "0e3341cf-9ee0-4347-9458-bfd2a527cc10",
+    "relation": "NOT_YET_IMPLEMENTED",
+    "fact": "MVP 尚未落地实现蒸馏流程。",
+    "valid_at": "2026-02-26 16:53:49.469000",
+    "invalid_at": "2026-02-26 17:06:55.444000",
+    "episodes": []
+  },
+  {
+    "id": "80aca451-bbc4-44bd-b793-bc1ef558a49d",
+    "source": "669a8370-9c22-4478-89c5-5144618de645",
+    "target": "c42cab76-1c00-404e-8645-256e1c04c39b",
+    "relation": "SUPPORTS",
+    "fact": "开源框架能够承载记忆层。",
+    "valid_at": "2026-02-26 16:53:49.469000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "2c95f69a-a2c9-4ad3-876d-de507b979af2",
+    "source": "c0a7f343-91c2-4c0a-868e-b7b6f7592959",
+    "target": "71820589-c2ce-4b18-8329-0bda4203b129",
+    "relation": "DESCRIBED_IN",
+    "fact": "记忆/知识库设计被写入并记录在项目文档中",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "51e48609-95b2-441f-be64-25c97cfd2f60",
+    "source": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "target": "71820589-c2ce-4b18-8329-0bda4203b129",
+    "relation": "RECOMMENDED_IN",
+    "fact": "Mem0 的推荐路线已被纳入项目文档",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "770030b0-2709-44fc-af6c-297e54ad1bb1",
+    "source": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "target": "a9f99ff4-75dd-458d-98d3-bdacb8414aa3",
+    "relation": "SUITABLE_FOR",
+    "fact": "Mem0 更适合用于语义检索。",
+    "valid_at": "2026-02-26 17:06:55.444000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "617ad9a2-75b6-4a25-b371-f05438779a7b",
+    "source": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "target": "a9f99ff4-75dd-458d-98d3-bdacb8414aa3",
+    "relation": "COMPATIBLE_WITH",
+    "fact": "Mem0 与语义检索较为契合",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "44c1cf31-6388-4ef3-ae00-6e07718b9783",
+    "source": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "target": "78fb3b99-7de8-4fb7-8bd4-d1ba56c64a60",
+    "relation": "SUITABLE_FOR",
+    "fact": "Mem0 更适合用于知识图谱。",
+    "valid_at": "2026-02-26 17:06:55.444000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b71e95c6-a0c3-4fdf-ae96-fa2ba6a4f253",
+    "source": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "target": "78fb3b99-7de8-4fb7-8bd4-d1ba56c64a60",
+    "relation": "COMPATIBLE_WITH",
+    "fact": "Mem0 与知识图谱较为契合",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "48251873-8b16-4cf1-b0ec-311a05cbd37c",
+    "source": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "target": "03996794-02fe-4976-bd16-79f292fa4779",
+    "relation": "SUITABLE_FOR",
+    "fact": "Mem0 更适合满足多用户记忆需求。",
+    "valid_at": "2026-02-26 17:06:55.444000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "c337f536-cdcb-4d25-8a41-da9179151d9c",
+    "source": "3b349e03-2c46-4a52-a3e8-fb375472db8c",
+    "target": "03996794-02fe-4976-bd16-79f292fa4779",
+    "relation": "COMPATIBLE_WITH",
+    "fact": "Mem0 与多用户记忆需求较为契合",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9f357eea-6e7f-4a6b-a45d-88c4dad40b68",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "59e99662-c44b-48bb-addb-1f2deb2ff743",
+    "relation": "USES",
+    "fact": "MVP 以结构化文本存储为主要存储模式。",
+    "valid_at": "2026-02-26 17:06:55.444000",
+    "invalid_at": "2026-02-27 02:40:21.324000",
+    "episodes": []
+  },
+  {
+    "id": "cd0dd3e4-8a84-4080-90c2-7c65ece82714",
+    "source": "bf9c285f-41f8-4c19-8195-db26018543bc",
+    "target": "59e99662-c44b-48bb-addb-1f2deb2ff743",
+    "relation": "PART_OF",
+    "fact": "结构化文本存储是该存储与检索模型的一种实现形式",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6d07d1ad-6c8d-4749-b839-977bbbe30653",
+    "source": "ed89dfe7-b56e-4766-b3c4-61de43417363",
+    "target": "5cbd0779-a4b8-4132-a0bf-a31602b15841",
+    "relation": "DEFERRED_TO",
+    "fact": "语义向量将留待后续迭代实现。",
+    "valid_at": "2026-02-26 17:06:55.444000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "98b41800-1c11-483f-9566-54227c6dfb0b",
+    "source": "0e3341cf-9ee0-4347-9458-bfd2a527cc10",
+    "target": "5cbd0779-a4b8-4132-a0bf-a31602b15841",
+    "relation": "DEFERRED_TO",
+    "fact": "蒸馏流程将留待后续迭代实现。",
+    "valid_at": "2026-02-26 17:06:55.444000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3ff2a91d-83f1-4785-91b1-b100222d4ae5",
+    "source": "bbb746d1-d92c-4c50-a897-4935477c7d65",
+    "target": "bfdb5a60-7c6e-46a3-a10e-b6d559291656",
+    "relation": "DESCRIBED_IN",
+    "fact": "数据包格式说明用于定义数据包规范的格式",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "202bb646-b612-4593-a628-6330cba74307",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "45610234-239c-4fda-8a0b-f51afd752451",
+    "relation": "USES",
+    "fact": "Minusjiang 使用 mvp-plan.md 来明确当前 MVP 的范围、优先级与落地计划。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d61ab321-44d2-4b5a-be9a-4e1ef51e00aa",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "7da5a785-89ff-471a-9024-9e2ecd83691d",
+    "relation": "USES",
+    "fact": "Minusjiang 使用 mvp-todolist.md 来明确当前 MVP 的范围、优先级与落地计划。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9d6b00fa-41be-4c5d-8ea3-403921ed3bb1",
+    "source": "104ee4e6-0d48-4d63-a037-1e7416dfd7bf",
+    "target": "11785150-6cad-4bdf-b646-304c9e126a3b",
+    "relation": "GENERATES",
+    "fact": "将 requirements.md 与 mvp-plan.md、mvp-todolist.md 的内容整合，生成 MVP范围声明、优先级与验收标准",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ab3ca1af-0b82-4c57-8001-f7bacb7e541a",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "653c04a7-7ed3-4169-b9ca-cd846b4bc9ee",
+    "relation": "HAS_CAPABILITY",
+    "fact": "MVP 已覆盖登录/鉴权。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "fc99015f-b533-4f60-9ab2-7526de734f55",
+    "source": "11785150-6cad-4bdf-b646-304c9e126a3b",
+    "target": "653c04a7-7ed3-4169-b9ca-cd846b4bc9ee",
+    "relation": "INCLUDES",
+    "fact": "MVP范围声明包括登录",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e7b3f6b3-1e84-42ca-a637-ec3d47ddbc1a",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "67a6b681-210f-411d-902e-1662d459c143",
+    "relation": "HAS_CAPABILITY",
+    "fact": "MVP 已覆盖数据导入导出。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6f28e01a-e4f1-40ff-b93e-a7c651c1378a",
+    "source": "11785150-6cad-4bdf-b646-304c9e126a3b",
+    "target": "67a6b681-210f-411d-902e-1662d459c143",
+    "relation": "INCLUDES",
+    "fact": "MVP范围声明包括数据导入导出",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "42637286-e105-4b90-95f0-38f86868b52d",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "c27afd3d-ef6c-4a5e-b444-45637ebe3654",
+    "relation": "HAS_CAPABILITY",
+    "fact": "MVP 已覆盖基础可视化中的仪表盘。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8e50954f-4959-41ba-869e-9a8de0d7eedd",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "c27afd3d-ef6c-4a5e-b444-45637ebe3654",
+    "relation": "IMPROVES",
+    "fact": "前端开发对仪表盘进行了改进",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6e5ac90a-d6fa-4e83-bc57-94b94f4c943b",
+    "source": "11785150-6cad-4bdf-b646-304c9e126a3b",
+    "target": "c27afd3d-ef6c-4a5e-b444-45637ebe3654",
+    "relation": "INCLUDES",
+    "fact": "MVP范围声明包括仪表盘",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3ca1da78-5cba-4d3c-9578-54e80461b44f",
+    "source": "e1083b07-b33b-4198-91ea-a3b5574461b1",
+    "target": "c27afd3d-ef6c-4a5e-b444-45637ebe3654",
+    "relation": "INTEGRATES_WITH",
+    "fact": "像素头像的渲染与交互已集成到仪表盘。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d092d3ec-8028-4715-aaf7-f680ae1b972d",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "c45a158f-6488-466c-9f85-d6390b43ee89",
+    "relation": "HAS_CAPABILITY",
+    "fact": "MVP 已覆盖基础可视化中的活动流。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "bf9c85be-ea35-4ca0-9c86-90e4c86c668d",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "c45a158f-6488-466c-9f85-d6390b43ee89",
+    "relation": "IMPROVES",
+    "fact": "前端开发对活动流进行了改进",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1e91773d-dfb4-4965-86e0-740148564903",
+    "source": "11785150-6cad-4bdf-b646-304c9e126a3b",
+    "target": "c45a158f-6488-466c-9f85-d6390b43ee89",
+    "relation": "INCLUDES",
+    "fact": "MVP范围声明包括活动流",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "08b08b27-9039-46ea-ba26-7a8372aad5d4",
+    "source": "e1083b07-b33b-4198-91ea-a3b5574461b1",
+    "target": "c45a158f-6488-466c-9f85-d6390b43ee89",
+    "relation": "INTEGRATES_WITH",
+    "fact": "像素头像的渲染与交互已集成到活动流。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4eae3910-5473-44b8-91fc-905f13eeb902",
+    "source": "c27afd3d-ef6c-4a5e-b444-45637ebe3654",
+    "target": "c45a158f-6488-466c-9f85-d6390b43ee89",
+    "relation": "INTERACTS_WITH",
+    "fact": "仪表盘与活动流组件在探索过程中被关联",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "246edba1-361b-4b8b-8c2f-dd7f50d7f23e",
+    "source": "d0a91ace-6cd4-4efa-8407-91944d429b17",
+    "target": "2081dc76-3175-447e-b106-935643962311",
+    "relation": "HAS_CAPABILITY",
+    "fact": "MVP 已覆盖个人空间。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1edd7a4a-aa16-4b1b-9e78-4856ac0958c6",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "ac26eb75-3cb6-426e-962c-3b46fca1f787",
+    "relation": "PROTOTYPE_STATUS",
+    "fact": "状态管理处于雏形阶段。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9dc7297d-152c-468a-92c2-ac63ae93cd76",
+    "source": "69b101ad-cc41-4435-8e12-9caddc762337",
+    "target": "a36bff6b-e397-4e10-b67a-04f8ff7fd209",
+    "relation": "INTEGRATES_WITH",
+    "fact": "接口需要与端到端用户路径整合。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d88ba5f2-b4b6-4006-b861-0edd162f5d34",
+    "source": "ac26eb75-3cb6-426e-962c-3b46fca1f787",
+    "target": "a36bff6b-e397-4e10-b67a-04f8ff7fd209",
+    "relation": "INTEGRATES_WITH",
+    "fact": "状态管理需要与端到端用户路径整合。",
+    "valid_at": "2026-02-26 17:35:30.124000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e2db5474-20b8-42fc-b6f2-663a1054199a",
+    "source": "11785150-6cad-4bdf-b646-304c9e126a3b",
+    "target": "a36bff6b-e397-4e10-b67a-04f8ff7fd209",
+    "relation": "DEFINES",
+    "fact": "MVP范围声明定义了端到端用户旅程",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3d907058-b27a-4219-9534-5bd438b26250",
+    "source": "dfeee422-19f5-4b17-ae96-e3dd1921f493",
+    "target": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "relation": "INTEGRATES_WITH",
+    "fact": "CLI 与 Web 关键模块已初步实现并重构",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8fec8648-7ef4-4e10-8de1-332212abec3e",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "3e2cd149-5545-4607-878e-c7d528d21a8b",
+    "relation": "IMPROVES",
+    "fact": "前端开发对导航进行了改进",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "2ec2be0b-afd9-406b-ac56-51ef74154255",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "9848d66e-8afa-480c-a4be-3a508896aa07",
+    "relation": "IMPROVES",
+    "fact": "前端开发对布局进行了改进",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b9bf2d71-4310-4de5-96f1-bbe364eb86c0",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "54d47781-d4a2-4827-8657-7be87ece9301",
+    "relation": "IMPROVES",
+    "fact": "前端开发对我的影子页面与组件进行了改进",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a57e213e-e7ad-4fc8-a770-afb37c0ef6c0",
+    "source": "11785150-6cad-4bdf-b646-304c9e126a3b",
+    "target": "54d47781-d4a2-4827-8657-7be87ece9301",
+    "relation": "INCLUDES",
+    "fact": "MVP范围声明包括我的影子",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9f3ce97e-ebd9-41af-b615-ac3f1db71f4d",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "e3a21254-9fee-4443-a033-5b1706c52b18",
+    "relation": "IMPROVES",
+    "fact": "前端开发对资料页面与组件进行了改进",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a64e0b6f-9107-4b46-a26c-fdad4bc0fdd4",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "relation": "IMPROVES",
+    "fact": "前端开发对项目页面与组件进行了改进",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5bf93335-9b33-4e6f-8e31-d33777c111f2",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "relation": "TRIGGERS_SEARCH_ON",
+    "fact": "MCP 工具 触发本地项目中的代码搜索",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "5849d35f-85b0-4ed0-8e22-0ef4186c8038",
+    "source": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "target": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "relation": "REQUIRES",
+    "fact": "MCP 的项目搜索接口 需要传入一个 project。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "b8df8402-fc4e-43e8-b895-725129106dad",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "relation": "REQUIRES_PARAMETER",
+    "fact": "MCP 搜索接口需要显式提供 project 参数。",
+    "valid_at": "2026-02-27 08:08:36.610000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ea1e8cfd-8eee-436d-9930-f3ac2a69927e",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "91b55993-c2ee-45c1-b52d-c356c4de4dac",
+    "relation": "IMPROVES",
+    "fact": "前端开发对记忆页面与组件进行了改进",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "178dbc2e-4d7d-43b4-83c6-af82ce0e2477",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "6dd51688-5fb0-4842-a80e-9ca0ccd5bc21",
+    "relation": "CHECKS",
+    "fact": "前端开发对前端API契约进行了检查",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3fed4e36-969b-4efd-897b-39f3d2810085",
+    "source": "392ce983-7fc5-482f-8894-6c500e0ab0a3",
+    "target": "f456571b-cef4-4e20-b931-9c625dbe54d9",
+    "relation": "CHECKS",
+    "fact": "前端开发对构建配置进行了检查",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9aa93e59-bd82-4a78-8ab4-9abd70c91542",
+    "source": "dfeee422-19f5-4b17-ae96-e3dd1921f493",
+    "target": "f456571b-cef4-4e20-b931-9c625dbe54d9",
+    "relation": "UPDATED",
+    "fact": "CLI 对构建配置进行了更新",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "7e149edf-e6b7-4269-a563-e2a8f8706c7e",
+    "source": "6560c372-6284-4310-a2ce-70fdfb88c828",
+    "target": "12edfd90-e747-417d-a99f-23992fa4cf49",
+    "relation": "USES",
+    "fact": "本项目将 better-sqlite3 作为 SQLite 的首选驱动并使用。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ab59c293-fd70-45ef-ac78-1fbf6166b515",
+    "source": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "target": "12edfd90-e747-417d-a99f-23992fa4cf49",
+    "relation": "CONFIGURED_WITH",
+    "fact": "Drizzle 配置为与 better-sqlite3 搭配使用。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4fae2120-f77d-47bf-bb6c-25316e76a924",
+    "source": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "target": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "relation": "INTEGRATES_WITH",
+    "fact": "drizzle-kit 已锁定版本以确保与 Drizzle 的集成。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1b61c081-59ad-4301-89af-672180b59f75",
+    "source": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "target": "7bd49978-fe17-4e39-a873-3b0e25ce5bc1",
+    "relation": "CONFIGURES_MIGRATION_FLOW",
+    "fact": "Drizzle 的 db:push 迁移流程已配置。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "49b5aa71-8b40-47a8-aad6-199e1592f8f0",
+    "source": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "target": "7bd49978-fe17-4e39-a873-3b0e25ce5bc1",
+    "relation": "USES",
+    "fact": "Drizzle 使用 db:push 迁移脚本。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3d8a1599-d0b8-4b41-bd98-0e4318c9e326",
+    "source": "a62dd802-c536-4bff-821d-1f8bb62a531a",
+    "target": "7bd49978-fe17-4e39-a873-3b0e25ce5bc1",
+    "relation": "PROVIDES",
+    "fact": "drizzle-kit 提供 db:push 命令用于数据库推送",
+    "valid_at": "2026-02-27 08:40:17.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "12ce7ad9-a07b-4253-ad09-3b5384dd4065",
+    "source": "5c6dc924-143a-49e8-a419-e6f39c43204d",
+    "target": "7bd49978-fe17-4e39-a873-3b0e25ce5bc1",
+    "relation": "REPLACED_BY",
+    "fact": "drizzle 提供的 db:push 替代 db:generate 命令",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ddb678f9-2998-4a17-bb61-5c85f9145e5e",
+    "source": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "target": "e6bd9329-10b6-4930-8e98-249a38d9147b",
+    "relation": "RUNS_ON",
+    "fact": "CLI 在 Windows 环境下运行。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "423c7938-7e30-4362-9851-7a23903c4b80",
+    "source": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "target": "e6bd9329-10b6-4930-8e98-249a38d9147b",
+    "relation": "COMPATIBLE_WITH",
+    "fact": "Drizzle 在 Windows 上进行了兼容性处理。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e7764042-d017-48bb-8405-744d19ea61b2",
+    "source": "12edfd90-e747-417d-a99f-23992fa4cf49",
+    "target": "a6fe9ff6-d2c0-43be-b858-7cfaf1108ca0",
+    "relation": "USES",
+    "fact": "Better-sqlite3 被用来访问 SQLite，作为本地的首选方案。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6e2269cd-3979-4b78-a8c4-2cac1a4c9e71",
+    "source": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "target": "a6fe9ff6-d2c0-43be-b858-7cfaf1108ca0",
+    "relation": "CONFIGURED_FOR",
+    "fact": "Drizzle 的配置为使用 SQLite。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "65b65612-797a-40e1-ad2d-56efbed18890",
+    "source": "79f59257-3048-4edc-8183-085c22f9d2e1",
+    "target": "cc7e1fc5-ebb4-40a1-83dc-682af1032297",
+    "relation": "HAS_STRUCTURE",
+    "fact": "内存数据库 具有 表结构。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e0d3c11e-73fe-4d8b-bfcb-9325ad92ce29",
+    "source": "79f59257-3048-4edc-8183-085c22f9d2e1",
+    "target": "268f51ed-a362-4609-8bee-3614b2310857",
+    "relation": "HAS_RECORDS_COUNT",
+    "fact": "内存数据库的记录量已成功查询。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5fc4d8a4-d0bb-4167-988d-a2845202bdba",
+    "source": "fe57321a-0751-4046-bdfe-76627b8aaa66",
+    "target": "21073a43-670d-41c9-a94d-650aab02b774",
+    "relation": "INTERACTS_WITH",
+    "fact": "CLI 可与 服务端数据库 正常工作。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "590e17d0-8a8b-4a0d-bd13-1b3c8a195434",
+    "source": "7bd49978-fe17-4e39-a873-3b0e25ce5bc1",
+    "target": "21073a43-670d-41c9-a94d-650aab02b774",
+    "relation": "APPLIES_TO",
+    "fact": "db:push 迁移脚本应用于 服务端数据库。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "50a0ba07-9784-437c-9c24-947806005302",
+    "source": "7150c979-363e-45db-b0c5-855492c92b3a",
+    "target": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "relation": "RUNS_ON",
+    "fact": "Git 在 PowerShell 上运行",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0b0cf27e-3114-44ca-aeb1-90dffc940d75",
+    "source": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "target": "2dfe5243-be7c-4f53-b791-0a572ab40161",
+    "relation": "ALTERNATIVE_TO",
+    "fact": "为避免 Windows 下的 PowerShell 解析问题，建议使用 npx 作为替代方案。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5b3e3e69-2f95-4410-9b0e-6f329cbc018d",
+    "source": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "target": "b20fafdf-fb36-4c04-ba15-52f83be50ceb",
+    "relation": "ALTERNATIVE_TO",
+    "fact": "为避免 Windows 下的 PowerShell 解析问题，亦可使用 终端兼容模式 作为替代。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "fa5bc9c9-c7d7-4ee9-8dd4-24c5900852c2",
+    "source": "2dfe5243-be7c-4f53-b791-0a572ab40161",
+    "target": "b20fafdf-fb36-4c04-ba15-52f83be50ceb",
+    "relation": "ALTERNATIVE_TO",
+    "fact": "npx 与 终端兼容模式可作为 PowerShell 的替代方案之一。",
+    "valid_at": "2026-02-27 02:40:21.324000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "027bc57f-8ad4-48a1-b179-1ba8ecdbc1e9",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "eb92af3b-2e06-455d-9ce5-d7a00cb5b31f",
+    "relation": "INVOLVED_IN_ISSUE_WITH",
+    "fact": "MCP 与 Worker API 存在配置或稳定性问题。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "c87deb77-14ae-4c78-ac60-ead5495c9f97",
+    "source": "56bc5efc-048e-41e8-9aa2-f4c955e3cc5a",
+    "target": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "relation": "REQUIRES_INPUT",
+    "fact": "搜索接口需要 project 参数",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": "2026-02-27 07:46:51.232000",
+    "episodes": []
+  },
+  {
+    "id": "c82d3882-5b1b-4698-8a94-5adc70d33624",
+    "source": "643479ae-f72c-414c-9897-d84533294e2f",
+    "target": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "relation": "MISSING_PARAMETER",
+    "fact": "400 错误因缺少参数 project 而发生",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "616944ae-4b04-4bea-b35c-fb9b4c1ab060",
+    "source": "eb92af3b-2e06-455d-9ce5-d7a00cb5b31f",
+    "target": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "relation": "REQUIRES_INPUT",
+    "fact": "Worker API 需要同时提供有效的 project 作为输入。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "47c4af93-1f8d-4d92-955b-25b554052e1d",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "2a05a93c-a19d-4379-b9b7-90c9769b44f3",
+    "relation": "SEARCHES",
+    "fact": "MCP 对 项目 执行搜索。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a0c7017d-8e8a-4628-b460-37689f7d261f",
+    "source": "56bc5efc-048e-41e8-9aa2-f4c955e3cc5a",
+    "target": "68a40e47-e810-4938-a725-2b5ff779a521",
+    "relation": "REQUIRES_INPUT",
+    "fact": "搜索接口需要 query 参数",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": "2026-02-27 07:46:51.232000",
+    "episodes": []
+  },
+  {
+    "id": "c10c3852-da6d-475f-9969-2b167884889e",
+    "source": "643479ae-f72c-414c-9897-d84533294e2f",
+    "target": "68a40e47-e810-4938-a725-2b5ff779a521",
+    "relation": "MISSING_PARAMETER",
+    "fact": "400 错误因缺少参数 query 而发生",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "aa495897-db56-43e5-8b30-e0011f6f0b23",
+    "source": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "target": "68a40e47-e810-4938-a725-2b5ff779a521",
+    "relation": "REQUIRES",
+    "fact": "MCP 的项目搜索接口 需要传入一个 query。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "f57b4d36-3e8d-4670-a811-56ca913c292f",
+    "source": "eb92af3b-2e06-455d-9ce5-d7a00cb5b31f",
+    "target": "68a40e47-e810-4938-a725-2b5ff779a521",
+    "relation": "REQUIRES_INPUT",
+    "fact": "Worker API 需要同时提供有效的 query 作为输入。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "75874432-bcb2-42fc-bc2c-60531ab85d01",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "68a40e47-e810-4938-a725-2b5ff779a521",
+    "relation": "REQUIRES_PARAMETER",
+    "fact": "MCP 搜索接口需要显式提供 query 参数。",
+    "valid_at": "2026-02-27 08:08:36.610000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "bd7f8563-2a1c-4859-8f30-079600220c6f",
+    "source": "56bc5efc-048e-41e8-9aa2-f4c955e3cc5a",
+    "target": "643479ae-f72c-414c-9897-d84533294e2f",
+    "relation": "CAUSES_ERROR",
+    "fact": "空参数会触发 400 错误",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "5786c818-56ae-4a87-a040-3164aed26c29",
+    "source": "f42b870a-0566-4a5e-bed3-115ffca594a5",
+    "target": "643479ae-f72c-414c-9897-d84533294e2f",
+    "relation": "PREVENTS",
+    "fact": "输入校验防止空查询导致 400 错误",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4bae092a-be58-42ff-82ad-9e120ac20732",
+    "source": "eb92af3b-2e06-455d-9ce5-d7a00cb5b31f",
+    "target": "643479ae-f72c-414c-9897-d84533294e2f",
+    "relation": "TRIGGERS_ERROR",
+    "fact": "向 Worker API 传入空参数将触发 400 错误。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "c093d156-06b5-4402-9289-eb0a80d31716",
+    "source": "eb92af3b-2e06-455d-9ce5-d7a00cb5b31f",
+    "target": "643479ae-f72c-414c-9897-d84533294e2f",
+    "relation": "TRIGGERS_400_ERROR",
+    "fact": "Worker API 需要有效的 project 和 query，空参数会触发 400 错误。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "68706280-d02a-40a6-a73e-31f902813c54",
+    "source": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "target": "643479ae-f72c-414c-9897-d84533294e2f",
+    "relation": "CAUSES",
+    "fact": "MCP 搜索缺少必需的 project 与 query 参数，导致 HTTP 400 错误。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b232caa5-8dff-49bd-a7ec-3be0424860bb",
+    "source": "56bc5efc-048e-41e8-9aa2-f4c955e3cc5a",
+    "target": "0eae9ade-7d09-4dea-ba72-3ae166833b93",
+    "relation": "CAUSES_ERROR",
+    "fact": "即便补全参数后仍出现 500 错误",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "f2e6aa66-ab16-4ebf-9776-537fd63a70aa",
+    "source": "335be26a-65af-4a4d-99e6-59c35787e768",
+    "target": "0eae9ade-7d09-4dea-ba72-3ae166833b93",
+    "relation": "CAUSES_ERROR",
+    "fact": "后端返回 500 错误。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9c7a97e6-716e-4507-be5e-f4a86fad896c",
+    "source": "eb92af3b-2e06-455d-9ce5-d7a00cb5b31f",
+    "target": "0eae9ade-7d09-4dea-ba72-3ae166833b93",
+    "relation": "RETURNS_500_ERROR",
+    "fact": "后端返回 500 错误。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "91af8921-abf7-44d5-a15f-bc78dc146bb2",
+    "source": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "target": "0eae9ade-7d09-4dea-ba72-3ae166833b93",
+    "relation": "CAUSES",
+    "fact": "MCP 搜索缺少必需的 project 与 query 参数，导致 HTTP 500 错误。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "21a3fa5a-b792-4d59-88db-4e4c61b0a296",
+    "source": "0eae9ade-7d09-4dea-ba72-3ae166833b93",
+    "target": "32ae39ab-f486-4624-9c3f-e87359e64abb",
+    "relation": "ASSOCIATED_WITH",
+    "fact": "500 错误疑似由后端服务/索引或配置异常引起",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "99cf163d-e093-44ec-b768-0c715e02ac3b",
+    "source": "465f842b-3b6b-4372-85fd-4f4ab1b6eaac",
+    "target": "4f343480-2635-4cf0-bf64-ab96b86b875c",
+    "relation": "INSPECTS_LOGS",
+    "fact": "MCP Worker API inspects server logs to locate 500 errors",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e299196c-4d6d-4674-95c1-156f9a55b0d0",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "7b66ce94-abd6-4801-846f-08c8f678775f",
+    "relation": "TRIGGERS",
+    "fact": "minusjiang 触发对 MCP Worker 的检查与重启。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "dcc89835-42c7-48fa-8ef4-4112cf2f7f7f",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "7b66ce94-abd6-4801-846f-08c8f678775f",
+    "relation": "CHECKS_CONNECTION",
+    "fact": "MCP 检查 Worker/MCP 的连接配置是否正常。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "639104a6-418c-4c3e-9429-2edd5e186816",
+    "source": "7b66ce94-abd6-4801-846f-08c8f678775f",
+    "target": "1a82ba8e-b7ca-480e-b531-7dbf32a0b901",
+    "relation": "TRIGGERS",
+    "fact": "Worker/MCP 服务 触发索引",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "85b8131c-f6e7-4296-8a70-25b4b389ae78",
+    "source": "4f343480-2635-4cf0-bf64-ab96b86b875c",
+    "target": "1a82ba8e-b7ca-480e-b531-7dbf32a0b901",
+    "relation": "CONFIRMS",
+    "fact": "日志确认索引状态已完成",
+    "valid_at": "2026-02-27 07:45:07",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0af212a6-3142-4839-8ee9-73ff37957a23",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "031486b0-58bb-4774-b089-8b3227c91a57",
+    "relation": "SEARCHES_IN",
+    "fact": "MCP 在本地代码库中执行搜索",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1274cd65-596a-4b96-b27e-20e657f85059",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "031486b0-58bb-4774-b089-8b3227c91a57",
+    "relation": "USES",
+    "fact": "MCP 使用本地代码库来执行关键词/符号搜索。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "509607df-ec0e-427c-80d2-8a47e980e8e2",
+    "source": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "target": "031486b0-58bb-4774-b089-8b3227c91a57",
+    "relation": "SEARCHES",
+    "fact": "MCP 的项目搜索接口 在本地代码库中执行搜索。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "6c33a099-c33a-4561-9085-4f0c288aa4a3",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "f0f930f3-70a1-4084-b2c4-8ebbc811413b",
+    "relation": "SEARCHES_FOR",
+    "fact": "MCP 搜索 关键词/符号",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "64f940cd-5a72-455a-a6f2-3e65457cd645",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "relation": "USES",
+    "fact": "MCP 使用其项目搜索接口。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "c691c0ae-3681-49fc-9722-e0e57d6aeeb1",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "relation": "INITIATES",
+    "fact": "MCP initiates a project-internal search",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b52b49f8-e05e-4629-bdc5-57620989e994",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "relation": "ATTEMPTS_PROJECT_SEARCH",
+    "fact": "MCP attempts project search due to interface errors",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3765e9bf-c020-4e72-9584-bfb9c358ad23",
+    "source": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "target": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "relation": "USES_PROJECT_SEARCH",
+    "fact": "UI Enhancement v3 uses project search to collect required information",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d9c813d7-0f9f-41b8-9df8-dea85adaaca4",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "a4bc4397-928a-4a40-bf3c-61defdd3aa49",
+    "relation": "FIXES",
+    "fact": "minusjiang 修复了与 MCP 搜索相关的工具链问题。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5ca9b94b-f5d1-4f6d-8068-468108dd71c0",
+    "source": "7b66ce94-abd6-4801-846f-08c8f678775f",
+    "target": "ed744253-4963-456e-b9e1-027547223ae7",
+    "relation": "CONFIGURES",
+    "fact": "MCP Worker 配置搜索服务及索引。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 07:53:53.970000",
+    "episodes": []
+  },
+  {
+    "id": "55972d9d-52e5-4b87-843f-40bdae10c9ba",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "ed744253-4963-456e-b9e1-027547223ae7",
+    "relation": "TRIGGERS",
+    "fact": "minusjiang 触发对搜索服务的检查与重启。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "f785ce84-6262-42b9-a3d4-8cf75c0d25e3",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "9c647280-be0f-4961-b52e-f00dde94ec37",
+    "relation": "USES",
+    "fact": "minusjiang 将本地搜索工具作为后备方案以应对 MCP 异常。",
+    "valid_at": "2026-02-27 07:46:51.232000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "bcd2664e-c075-47b5-b37a-4c74908a8a75",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "relation": "SEARCHES_RELATED_CONTENT",
+    "fact": "MCP 在本地项目中搜索与 UI增强v3 相关的内容以完善文档。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": "2026-02-27 08:08:36.610000",
+    "episodes": []
+  },
+  {
+    "id": "dce3487f-2321-41cb-b949-2aced1360d65",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "relation": "IDENTIFIES_RELEVANT_CONTENT",
+    "fact": "MCP 定位与 UI增强v3 相关内容以完善文档。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "386fc4a3-5251-4bb3-9649-4d8e355b8784",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "relation": "WORKS_ON",
+    "fact": "minusjiang 负责为 UI Enhancement v3 制定并完善功能规划与待办清单。",
+    "valid_at": "2026-02-27 08:08:36.610000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "2e9cd12b-abe7-4cb2-b2aa-23359bc68326",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "relation": "PERFORMS_SEARCH_ON",
+    "fact": "MCP 在本地项目中执行搜索。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "241b252a-d6a1-4e3c-abdc-0905ae1f9bfe",
+    "source": "470435ea-3923-41b7-8ff7-02c427079713",
+    "target": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "relation": "PART_OF",
+    "fact": "UI Enhancement v3 是本地项目的一部分。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "95dbb899-961f-4b3b-b387-c390418e1ec6",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "relation": "WORKS_ON",
+    "fact": "minusjiang 在本地项目上工作。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6f1b2153-decd-4d32-9598-68a83c17618e",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "relation": "INITIALIZES_AS_GIT_REPOSITORY",
+    "fact": "minusjiang 将本地项目初始化为 Git 仓库",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1701f8f9-f925-47ea-aa7e-747d233d3c2f",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "relation": "WORKS_ON",
+    "fact": "在单仓项目中为记忆/活动系统加入中文摘要支持",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "17f9a34e-fab3-40a4-9c85-2cc0a8e6cb94",
+    "source": "0bc783ff-d65a-45c4-8528-f56cc287a1cf",
+    "target": "7522170b-d56b-4de2-98ad-c9412d0db2b8",
+    "relation": "INTEGRATES_WITH",
+    "fact": "备用检索方案集成本地索引。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "23470332-ddb5-4b17-b882-eed1c4e97a27",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "7522170b-d56b-4de2-98ad-c9412d0db2b8",
+    "relation": "FALLBACKS_TO",
+    "fact": "MCP uses local index/grep as a fallback",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5087c8c4-7830-4ab0-b797-e24cbf6f1c89",
+    "source": "0bc783ff-d65a-45c4-8528-f56cc287a1cf",
+    "target": "e16e4026-fd4c-4d1f-8cbe-ae02351df254",
+    "relation": "INTEGRATES_WITH",
+    "fact": "备用检索方案集成简单全文搜索。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "145964d0-bb3e-4c25-9981-9e05ac48bb3d",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "8b40ddc6-3433-44c8-82d8-fe930405f6cc",
+    "relation": "USES_PARAMETERS",
+    "fact": "MCP 使用搜索调用的参数并进行校验。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "3120b5fc-3295-4f05-86f6-549a0a70c056",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "6ab743fb-bbdc-4754-bbbf-5d40ab68b385",
+    "relation": "UPDATE_SEARCH_CONFIGURATION",
+    "fact": "MCP 更新了搜索配置以支持参数传递及错误处理与重试。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "a5021be0-2cee-455e-bfd9-6db909836188",
+    "source": "eb92af3b-2e06-455d-9ce5-d7a00cb5b31f",
+    "target": "6ab743fb-bbdc-4754-bbbf-5d40ab68b385",
+    "relation": "UPDATED_FOR_SEARCH",
+    "fact": "Worker API 的搜索配置被修复，增加错误处理与重试。",
+    "valid_at": "2026-02-27 07:53:53.970000",
+    "invalid_at": "2026-02-27 08:11:02.112000",
+    "episodes": []
+  },
+  {
+    "id": "8c574090-1e9e-4c2c-901e-4111417046dc",
+    "source": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "target": "36b7f752-f88f-4e59-bc05-450f039d4495",
+    "relation": "PLANS_IMPROVEMENTS_FOR",
+    "fact": "UI Enhancement v3 plans improvements for Recent Activity",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "17edc2b9-e5a0-4576-8510-5f52442d0934",
+    "source": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "target": "b5b1a659-2a3f-41de-afe3-236dfc707dc2",
+    "relation": "PLANS_IMPROVEMENTS_FOR",
+    "fact": "UI Enhancement v3 plans improvements for Memory Sync",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "bf775e5a-8cce-4b44-a0df-55d7f78f48b4",
+    "source": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "target": "32596993-8bef-40cc-b15f-ce614aebedeb",
+    "relation": "PLANS_IMPROVEMENTS_FOR",
+    "fact": "UI Enhancement v3 plans improvements for Shadow Card 视图",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6a7e6886-fbe3-4a4d-83b7-743578ab69bd",
+    "source": "e1083b07-b33b-4198-91ea-a3b5574461b1",
+    "target": "32596993-8bef-40cc-b15f-ce614aebedeb",
+    "relation": "INTEGRATES_WITH",
+    "fact": "像素头像组件已与 ShadowCard 前端组件集成。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "cd4955c0-01a8-4ed4-bed8-1656ba4e0566",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "32596993-8bef-40cc-b15f-ce614aebedeb",
+    "relation": "ENHANCES",
+    "fact": "minusjiang 增强 ShadowCard",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "08212c28-d7c9-4dc4-a4da-7180a221d466",
+    "source": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "target": "470435ea-3923-41b7-8ff7-02c427079713",
+    "relation": "UPDATED",
+    "fact": "UI Enhancement v3 planning document was updated",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ca41feb0-1010-4ebb-a865-1f0f0af4ea18",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "470435ea-3923-41b7-8ff7-02c427079713",
+    "relation": "SUPPORTS",
+    "fact": "minusjiang 支持并推进本地项目中的 UI Enhancement v3。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4afe48d4-74c3-4a6e-a29b-a52a53ae60b1",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "470435ea-3923-41b7-8ff7-02c427079713",
+    "relation": "WORKS_ON",
+    "fact": "minusjiang 在本地项目上协助推进 UI Enhancement v3。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0d70fc58-e5b3-4fcc-ac42-36ad31ef8553",
+    "source": "de315c31-7ea8-430d-9b4e-ce800f619c31",
+    "target": "9c856a39-1d02-4c39-858b-fe3acc988d38",
+    "relation": "UPDATED",
+    "fact": "UI Enhancement v3 To-Do List was updated",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5f9b94a5-2eb9-4b86-9968-9f72acdc0939",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "2007d1b2-0729-4ca8-b39a-1899a4ea20ab",
+    "relation": "FIXES",
+    "fact": "minusjiang 修复了与 Git 初始化相关的工具链问题。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "5fe76c57-b284-4fbe-9eb2-107bf8add420",
+    "source": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "target": "2007d1b2-0729-4ca8-b39a-1899a4ea20ab",
+    "relation": "INVOLVES",
+    "fact": "本地项目涉及仓库初始化。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "56b065df-6e03-48cb-8882-d0aeac2dc777",
+    "source": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "target": "53c8b9d3-6120-4cc4-a69b-26a514ef3647",
+    "relation": "DOES_NOT_SUPPORT",
+    "fact": "PowerShell 不支持使用 '&&' 进行链式命令。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": "2026-02-27 08:29:45.495000",
+    "episodes": []
+  },
+  {
+    "id": "0e0c77e3-b416-409d-9b7e-b5942a8b560b",
+    "source": "9dac694e-a42a-4ac2-b7b6-82069aeeb396",
+    "target": "ee5834b9-f2cb-4001-89e6-911958143531",
+    "relation": "IS_NOT_A_REPOSITORY",
+    "fact": "当前目录不是 Git 仓库。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "7eee53e1-89b8-4122-bfe7-30751a7f1496",
+    "source": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "target": "ee5834b9-f2cb-4001-89e6-911958143531",
+    "relation": "HAS_REPOSITORY",
+    "fact": "本地项目 拥有一个 Git 仓库。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": "2026-02-27 08:29:45.495000",
+    "episodes": []
+  },
+  {
+    "id": "887855c5-35af-4dab-8d9c-e89ce1458985",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "ee5834b9-f2cb-4001-89e6-911958143531",
+    "relation": "INITIALIZED_AS",
+    "fact": "minusjiang 将本地项目初始化为本地 Git 仓库",
+    "valid_at": "2026-02-27 08:40:17.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6a2b182c-7b8a-4996-8687-fb0b9ea4d31f",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "fb65200a-f34b-42d2-bbe6-8454665b6087",
+    "relation": "IMPROVES",
+    "fact": "minusjiang 改善了开发流程。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "bad3f55f-5fe0-42f0-9221-0384713a7cde",
+    "source": "6b141292-ab70-4fc9-be26-140c4baabda0",
+    "target": "fb65200a-f34b-42d2-bbe6-8454665b6087",
+    "relation": "IMPROVES",
+    "fact": "对前后端 UI 的改进提升了开发流程",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a999c1b6-8d57-47ce-b531-cf7048fccd5b",
+    "source": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "target": "871e7e30-c88f-43ca-8192-6444e7035d51",
+    "relation": "NOT_SUPPORTS",
+    "fact": "PowerShell 不支持 '&&' 链式命令，推荐使用 Git Bash 等 Shell。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": "2026-02-27 08:29:45.495000",
+    "episodes": []
+  },
+  {
+    "id": "dae4a7fa-67fe-417a-9264-3e2051fc84f2",
+    "source": "f9da5d68-14fa-4274-bbfd-a9d1569f30c4",
+    "target": "e42c40fd-a78c-4d85-a40c-2076feac59db",
+    "relation": "PERFORMS",
+    "fact": "MCP 执行 MCP 搜索。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9e26f9ed-463a-40ba-bab9-5e55af920419",
+    "source": "7150c979-363e-45db-b0c5-855492c92b3a",
+    "target": "3f1afddd-5ba4-48d4-9896-964165134221",
+    "relation": "PERFORMS",
+    "fact": "Git 执行了首次提交。",
+    "valid_at": "2026-02-27 08:11:02.112000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "71fb20c5-2585-4f0d-a1e0-45ba1d68b7ca",
+    "source": "2007d1b2-0729-4ca8-b39a-1899a4ea20ab",
+    "target": "3f1afddd-5ba4-48d4-9896-964165134221",
+    "relation": "HAS_FIRST_COMMIT",
+    "fact": "仓库初始化包含首次提交。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b2d280fc-f711-4358-8268-8cc02026af4d",
+    "source": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "target": "7aa6158c-2014-44f6-be0e-f419f639bd13",
+    "relation": "PUSHES_TO",
+    "fact": "本地项目已推送至指定的 GitHub 仓库。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1d0acb68-99ed-4771-a6f0-c6f84285a342",
+    "source": "4a5663bf-6b53-4217-8384-f251f145e375",
+    "target": "7aa6158c-2014-44f6-be0e-f419f639bd13",
+    "relation": "PUSHES_TO",
+    "fact": "主分支已推送到指定的 GitHub 仓库。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "67d6e303-8a23-4d20-ad5b-d788fd9ecec8",
+    "source": "ee5834b9-f2cb-4001-89e6-911958143531",
+    "target": "7aa6158c-2014-44f6-be0e-f419f639bd13",
+    "relation": "PUSHES_TO",
+    "fact": "本地 Git 仓库被推送至远程 GitHub 仓库",
+    "valid_at": "2026-02-27 08:40:17.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "2ee50f8b-a832-4899-8346-2012817e5f6c",
+    "source": "bee1f5a6-728c-4f72-9187-6dd5eab20d56",
+    "target": "7aa6158c-2014-44f6-be0e-f419f639bd13",
+    "relation": "REQUIRES",
+    "fact": "缺少 gh 时需手动创建远程后再向远程 GitHub 仓库推送",
+    "valid_at": "2026-02-27 08:40:17.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "323ef7be-87ca-43c3-9730-6f6226498f51",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "7aa6158c-2014-44f6-be0e-f419f639bd13",
+    "relation": "PUSHES_TO",
+    "fact": "minusjiang 将本地项目推送至 GitHub",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f3a59246-01b0-41c8-aa43-7a6c4c74b693",
+    "source": "5c6dc924-143a-49e8-a419-e6f39c43204d",
+    "target": "a62dd802-c536-4bff-821d-1f8bb62a531a",
+    "relation": "REPLACED_BY",
+    "fact": "数据库生成命令 db:generate 缺失，由 drizzle-kit 数据库迁移工具替代",
+    "valid_at": "2026-02-27 08:40:17.074000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "225fa3b8-4506-4bbd-af55-be10acb0194f",
+    "source": "26fecf18-0679-4019-8e89-f712e6dc0980",
+    "target": "26fecf18-0679-4019-8e89-f712e6dc0980",
+    "relation": "MISSING_REQUIREMENT",
+    "fact": "数据库生成脚本在脚本执行方式中缺少 generate 功能。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "babc3d2d-7980-4915-99f7-b98683acdb20",
+    "source": "a62dd802-c536-4bff-821d-1f8bb62a531a",
+    "target": "26fecf18-0679-4019-8e89-f712e6dc0980",
+    "relation": "EXECUTES",
+    "fact": "drizzle-kit 可以执行数据库脚本。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8d384daa-c96e-46d7-ac7b-0754f77459ab",
+    "source": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "target": "4d3b68ee-29a2-4aa9-8e4d-a772bb4351b6",
+    "relation": "PUSHES_TO",
+    "fact": "本地项目将与指定的 GitHub 仓库建立关联并推送代码。",
+    "valid_at": "2026-02-27 08:29:45.495000",
+    "invalid_at": "2026-02-27 08:40:17.074000",
+    "episodes": []
+  },
+  {
+    "id": "005491e8-1a2a-49cb-9596-0fa8878b5477",
+    "source": "2007d1b2-0729-4ca8-b39a-1899a4ea20ab",
+    "target": "6a423701-7920-4f5e-85af-3a67393defda",
+    "relation": "INVOLVES",
+    "fact": "仓库初始化涉及远程配置并推送主分支。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b85ce4b2-709f-4197-b1fe-7efa596ea383",
+    "source": "5ffd6aa1-e360-4c31-aa9e-3dace3d98100",
+    "target": "e1083b07-b33b-4198-91ea-a3b5574461b1",
+    "relation": "INTEGRATES_WITH",
+    "fact": "像素头像组件 与 像素头像 集成",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0477b9f8-cbc3-4443-95b7-a0ebe0567cbb",
+    "source": "26fecf18-0679-4019-8e89-f712e6dc0980",
+    "target": "0f9f2b69-581e-45c1-876d-499790459a51",
+    "relation": "PART_OF",
+    "fact": "数据库生成脚本是自动化流程的一部分。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1e9a8ba5-4fb7-4732-8d06-55d060d92baa",
+    "source": "26fecf18-0679-4019-8e89-f712e6dc0980",
+    "target": "0f9f2b69-581e-45c1-876d-499790459a51",
+    "relation": "PART_OF",
+    "fact": "数据库迁移脚本是自动化流程的一部分。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "175c3314-8951-4d10-9865-4f3fb827fcee",
+    "source": "bee1f5a6-728c-4f72-9187-6dd5eab20d56",
+    "target": "09b94812-b91d-487f-b136-3783e894d331",
+    "relation": "REQUIRES",
+    "fact": "gh CLI 缺失，需要手动配置远程。",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "2a15e02c-8c0b-4acf-bd61-c9911c481809",
+    "source": "f14c9955-036b-46e1-9941-17e48e93bfe5",
+    "target": "09b94812-b91d-487f-b136-3783e894d331",
+    "relation": "SUPPORTS_REMOTE_CONFIGURATION",
+    "fact": "PowerShell 支持 远程配置",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a98a139c-dad0-444d-9a84-256f2f5eb05b",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "09b94812-b91d-487f-b136-3783e894d331",
+    "relation": "CONFIGURES",
+    "fact": "完成 Git 远程配置",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a12746ad-c1b6-452a-86c7-c3910e608774",
+    "source": "aa8d25b4-4c88-4d10-8780-5b0df12605b5",
+    "target": "8976c0fe-11a1-4b1f-9918-6629752a64f8",
+    "relation": "SUPPORTS",
+    "fact": "drizzle 支持 数据库迁移",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f439d4c7-3956-4445-ab51-cc487da24633",
+    "source": "e8c5f5ce-63ab-4c8e-9e37-391e2df22510",
+    "target": "5c6dc924-143a-49e8-a419-e6f39c43204d",
+    "relation": "INTEGRATES_WITH",
+    "fact": "CI 已与 db:generate 自动化集成",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8574b412-cd7e-4929-8fe3-4cf649c6650c",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "e30f74b0-59e7-4ef4-81c0-ab9dd5711de3",
+    "relation": "IMPROVES",
+    "fact": "minusjiang 改善 前端 UI 组件",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ce25006a-4c30-460f-b209-a0949f36bf76",
+    "source": "6487f60c-58ee-45b3-86d4-e4a884f50d4b",
+    "target": "e30f74b0-59e7-4ef4-81c0-ab9dd5711de3",
+    "relation": "INTEGRATES",
+    "fact": "图标/字体 将整合进 组件库",
+    "valid_at": "2026-02-27 14:23:12.321000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "de0dfe6c-4b18-4d64-b33c-a8feda2de7d8",
+    "source": "2f0b90aa-ea16-481b-99de-0e9b6275201c",
+    "target": "e30f74b0-59e7-4ef4-81c0-ab9dd5711de3",
+    "relation": "INTEGRATES",
+    "fact": "主题变量 将整合进 组件库",
+    "valid_at": "2026-02-27 14:23:12.321000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f53b3520-78ad-4d03-932e-1d5326bd6981",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "3f30766f-be17-4a3a-9c02-8a959664ebef",
+    "relation": "ENHANCES",
+    "fact": "minusjiang 增强 前端活动流",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "c19022a6-41c4-47e1-b1f7-0442f5cc65ab",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "9b4aeed4-4f7c-4627-a060-9b48c354c14d",
+    "relation": "ENHANCES",
+    "fact": "minusjiang 增强 卡片",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ab3e1843-c514-4a83-879c-f1af45a43292",
+    "source": "e1083b07-b33b-4198-91ea-a3b5574461b1",
+    "target": "9b4aeed4-4f7c-4627-a060-9b48c354c14d",
+    "relation": "INTEGRATED_WITH",
+    "fact": "新增像素头像与卡片 UI，构成 UI 改进的一部分",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b3979c43-b84d-4ecf-a42c-23fde85c6dfe",
+    "source": "88aa82cd-e516-4074-bdd9-3cdbd20fbb5a",
+    "target": "b6f9dfb0-f5b4-4b9b-a20b-9eb7ca1ff11f",
+    "relation": "REPLACES",
+    "fact": "真实 LLM 将替代 Mock LLM",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "23506287-1c2e-4774-acae-dfaba56f057c",
+    "source": "a4ce191a-4abb-40f4-b9a0-ebaf4becee54",
+    "target": "b6f9dfb0-f5b4-4b9b-a20b-9eb7ca1ff11f",
+    "relation": "INCLUDES",
+    "fact": "流水线包含 Mock LLM 成分以支持摘要/活动流相关功能",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ea9ff4a6-6efb-4a4a-b351-49a7ac2d24c4",
+    "source": "e8c5f5ce-63ab-4c8e-9e37-391e2df22510",
+    "target": "a6b2df70-f2b9-4e41-8665-a7c908badd1b",
+    "relation": "INTEGRATES_WITH",
+    "fact": "CI 与 端到端测试 集成",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3de883f0-73d9-44d1-84e5-51f9e227f505",
+    "source": "7bd49978-fe17-4e39-a873-3b0e25ce5bc1",
+    "target": "8835ddfe-6dc1-4f2a-856e-619573a93c37",
+    "relation": "APPLIES_TO",
+    "fact": "db:push 应用于 扩展数据库 schema 的变更",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "bcf544ae-a39a-44e9-ab6e-0b56000d4f65",
+    "source": "7b85248e-7a85-42c4-87bc-9835b5ba377b",
+    "target": "4cd8f2ed-f23b-421b-baa1-b63981f842b4",
+    "relation": "PROVIDES",
+    "fact": "单仓项目为记忆/活动系统提供中文摘要支持",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "597fc011-5f88-4ea7-a644-806645f8e06f",
+    "source": "eb3cdb03-c0f9-4e24-8bb9-4383d352351f",
+    "target": "4cd8f2ed-f23b-421b-baa1-b63981f842b4",
+    "relation": "HAS_FEATURE",
+    "fact": "记忆/活动系统拥有中文摘要支持这一特性",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "212eeffe-21c1-476e-8297-3fc61807785d",
+    "source": "8835ddfe-6dc1-4f2a-856e-619573a93c37",
+    "target": "4cd8f2ed-f23b-421b-baa1-b63981f842b4",
+    "relation": "EXTENDS",
+    "fact": "对中文摘要的支持扩展了 schema 的能力",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a148b727-9292-4f38-83ea-d3bcb1017d8a",
+    "source": "51cbf455-36e8-4f83-af5e-0db2f2e11de3",
+    "target": "7bbf706e-e7c6-4f17-8561-3247279d5fb2",
+    "relation": "GENERATES",
+    "fact": "回填脚本生成中文摘要",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "199f1b5f-17aa-450b-802a-58d24ce5ece0",
+    "source": "5f6a1a86-0d82-401a-8dc9-767e2dd6feda",
+    "target": "2fd0a688-d23f-495c-9638-d079c473dc86",
+    "relation": "INTEGRATES_WITH",
+    "fact": "数据库模型与摘要/记忆服务相关联，形成数据支撑",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b56b8c21-836c-481e-890b-98018e56b201",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "6583f3c9-0322-49d4-b674-3b7ba1e1d012",
+    "relation": "LAUNCHES",
+    "fact": "完成本地开发/推送流程的首推",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "19f9d6f3-3bec-411c-8c92-2891d1b2021c",
+    "source": "b6f9dfb0-f5b4-4b9b-a20b-9eb7ca1ff11f",
+    "target": "a5173313-6f0d-48a2-83aa-eca7970400b2",
+    "relation": "REPLACED_BY",
+    "fact": "将 Mock LLM 换成真实模型以提升摘要/活动流的测试与监控",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "54516acf-c7a9-47b9-b140-e3bf52bd205d",
+    "source": "96f6b72c-6c21-48b0-9f63-3aa64e3ec619",
+    "target": "be501bd8-005a-4673-b4a3-a0e7bd87e7f5",
+    "relation": "PART_OF",
+    "fact": "本地双端口开发是本地开发/推送流程的一部分",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1b652b46-108a-4864-a970-4f3c7c770c63",
+    "source": "51cbf455-36e8-4f83-af5e-0db2f2e11de3",
+    "target": "b22cdc61-2d4e-4abe-95d2-f9c7ae0d4b34",
+    "relation": "GENERATES",
+    "fact": "回填脚本成功批量生成约100条中文摘要",
+    "valid_at": "2026-02-27 08:59:20.663000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "9ef15e8a-21a7-4b91-91d6-4aa0af3d983f",
+    "source": "59c29e50-af7f-47b2-8a9e-c4d53013c714",
+    "target": "cbbda6da-a193-4ba9-b2cb-0533bb915165",
+    "relation": "INTEGRATED_INTO",
+    "fact": "codebuddy-mem 将与统一 LLM 客户端一起集成进 shadow-person 单体仓库",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "571e0296-f7a3-4371-9565-47f3b6a5d40a",
+    "source": "01b6cfca-ed0c-4d41-a763-5ce35ec725ee",
+    "target": "cbbda6da-a193-4ba9-b2cb-0533bb915165",
+    "relation": "INTEGRATED_INTO",
+    "fact": "统一 LLM 客户端 将被集成到 shadow-person 单体仓库中，与 codebuddy-mem 一同实现集成",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "a35d43c9-bc81-4a51-a3e1-d32a299bf5eb",
+    "source": "9a3fbbb2-2c87-40b5-8844-de19c8f06cd3",
+    "target": "cbbda6da-a193-4ba9-b2cb-0533bb915165",
+    "relation": "DESIGNS_FOR",
+    "fact": "整体方案旨在将 codebuddy-mem 与统一 LLM 客户端集成进 shadow-person 单体仓库",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "cd78e180-a24e-4883-ac79-86755831382e",
+    "source": "11e80c2b-98e9-46b9-8ee1-5ff8354f2179",
+    "target": "cbbda6da-a193-4ba9-b2cb-0533bb915165",
+    "relation": "DESIGNS_FOR",
+    "fact": "实施步骤用于实现将 codebuddy-mem 与统一 LLM 客户端集成进 shadow-person 单体仓库",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "2955dd09-de56-4ff7-96da-a08106ccebfe",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "11e80c2b-98e9-46b9-8ee1-5ff8354f2179",
+    "relation": "REQUESTS",
+    "fact": "minusjiang 请求 一份 针对 基于 HTML5 Canvas 的 赛博朋克霓虹像素风仪表盘 UI 的实现步骤。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "50025365-400b-4248-aa7c-82bc650da340",
+    "source": "e62f8b19-5774-43af-af02-7db26041e341",
+    "target": "cd28d68c-147c-433b-83b3-863cf6bf9a14",
+    "relation": "ENHANCES",
+    "fact": "通过统一客户端抽象与共享内存服务可减少重复逻辑并提升一致性",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4cc281d0-6a8c-4a2d-bfcd-9c5f0caf5bcd",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "aacd399a-8422-4755-8609-6fb825088ba5",
+    "relation": "FIXES",
+    "fact": "minusjiang 修复了由 Vite 报告的前端构建与类型错误，使本地开发服务器成功启动",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8d2097bc-3c09-4895-bfbb-0c9e1ece2121",
+    "source": "aacd399a-8422-4755-8609-6fb825088ba5",
+    "target": "9e4391dd-ff6d-4bed-be9b-444a6c352c00",
+    "relation": "REPORTS_ERROR",
+    "fact": "Vite 报告 StationCanvas 缺少导出和 TS 类型不匹配",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "dc2d080b-3969-4d25-be4c-cf87b1874f7b",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "9e4391dd-ff6d-4bed-be9b-444a6c352c00",
+    "relation": "FIXES_EXPORT_ISSUE",
+    "fact": "Minusjiang identified and fixes the missing named export for StationCanvas, enabling the frontend build.",
+    "valid_at": "2026-02-27 14:16:13.075000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "8da7c519-47dd-449c-a7d8-758847e40ab1",
+    "source": "0ddedd11-7aa2-437a-948e-659dcd5d4f64",
+    "target": "9e4391dd-ff6d-4bed-be9b-444a6c352c00",
+    "relation": "TYPE_CHECKS_WITH_STATIONCANVAS",
+    "fact": "TypeScript 针对 StationCanvas 的相关代码执行了类型检查以定位不匹配。",
+    "valid_at": "2026-02-27 14:16:13.075000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "187fde24-4df8-43bd-87bb-8c78df457120",
+    "source": "9e4391dd-ff6d-4bed-be9b-444a6c352c00",
+    "target": "c4157125-606e-461e-a2d5-0173ce9e7670",
+    "relation": "TYPE_MISMATCH",
+    "fact": "StationCanvas 的命名导出与导入不一致，且布局相关存在类型不匹配，tiles 应为 TileType[]",
+    "valid_at": null,
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "2fcb5393-1c6f-45ea-bd9b-d019f133ad25",
+    "source": "9e4391dd-ff6d-4bed-be9b-444a6c352c00",
+    "target": "0adcdd8a-64ed-4b8c-8e82-cdfeb3e43457",
+    "relation": "ENABLES_START",
+    "fact": "对 StationCanvas 的修改使本地开发服务器能够成功启动。",
+    "valid_at": "2026-02-27 14:16:13.075000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0e698130-e478-46b7-a075-618376943375",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "3f0ff195-11c1-4f1a-9f9d-0f7ab1cb22ff",
+    "relation": "CORRECTS_TYPE_SIGNATURE",
+    "fact": "Minusjiang 纠正了 OfficeLayout 的类型签名。",
+    "valid_at": "2026-02-27 14:16:13.075000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6b0199ca-e723-4ac1-89e2-34515203eb8d",
+    "source": "9e4391dd-ff6d-4bed-be9b-444a6c352c00",
+    "target": "3f0ff195-11c1-4f1a-9f9d-0f7ab1cb22ff",
+    "relation": "UPDATE_TYPE_SIGNATURE_WITH_STATIONCANVAS",
+    "fact": "StationCanvas 的变动促使 OfficeLayout 的类型签名对齐 StationCanvas 的导出。",
+    "valid_at": "2026-02-27 14:16:13.075000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "f8ff2699-d07d-4be9-ac12-c011ac75d5f8",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "79527e9c-e925-40f9-b64f-5cb4141c43ce",
+    "relation": "CORRECTS_TYPE_SIGNATURE",
+    "fact": "Minusjiang 纠正了 tiles 的类型签名。",
+    "valid_at": "2026-02-27 14:16:13.075000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "e4db669b-f2a2-43a7-b18c-42fdf66c87f4",
+    "source": "df26fccc-69d0-4b73-bd21-f5187ef30bbb",
+    "target": "79527e9c-e925-40f9-b64f-5cb4141c43ce",
+    "relation": "TYPE_MISMATCH_WITH",
+    "fact": "布局对象的版本字面量与 tiles 的类型不一致。",
+    "valid_at": "2026-02-27 14:27:55.059000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "ce84bf7d-a2ca-45e6-8012-1c101aacc95d",
+    "source": "e8c5f5ce-63ab-4c8e-9e37-391e2df22510",
+    "target": "9512a4f8-303c-4cf3-b4b3-80b0c0d1f85c",
+    "relation": "INCLUDES_CHECKS_FOR",
+    "fact": "CI 与 Pre-commit 现在包含 TypeScript 与构建检查，以防止导出缺失和类型回归。",
+    "valid_at": "2026-02-27 14:16:13.075000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "c33c24e3-c82b-4d4e-9ebf-b21a02fc6d06",
+    "source": "ab2b1925-8c7f-485d-9fc8-f4e74af4c8a1",
+    "target": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "relation": "BASED_ON",
+    "fact": "赛博朋克霓虹像素风仪表盘 UI 基于 HTML5 Canvas。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "805b69a0-44b0-49fd-88f7-0af5e98beda5",
+    "source": "de5f1952-bae3-4d1c-81f6-6c7e7b77fbe2",
+    "target": "ab2b1925-8c7f-485d-9fc8-f4e74af4c8a1",
+    "relation": "DEFINES",
+    "fact": "UI 设计规范 定义 赛博朋克霓虹像素风仪表盘 UI 的视觉、布局、组件与动画等规范",
+    "valid_at": "2026-02-27 14:23:12.321000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4a9b7312-bdb7-480e-9e71-a57a6526636f",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "de5f1952-bae3-4d1c-81f6-6c7e7b77fbe2",
+    "relation": "REQUESTS",
+    "fact": "minusjiang 请求 一份 针对 基于 HTML5 Canvas 的 赛博朋克霓虹像素风仪表盘 UI 的设计规范。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "3263aa28-6e28-4b7e-a36b-6b307f750ab7",
+    "source": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "target": "662c1eeb-798c-4104-a475-4266308df2ab",
+    "relation": "USES",
+    "fact": "HTML5 Canvas 使用 阴影 实现 霓虹发光和像素风的视觉效果。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": "2026-02-27 14:23:12.321000",
+    "episodes": []
+  },
+  {
+    "id": "6d918eec-2a5a-4095-aeb2-6a0bbebb48e9",
+    "source": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "target": "e3da481b-4694-44a2-b4f4-0feb5b9b7a74",
+    "relation": "USES",
+    "fact": "HTML5 Canvas 使用 合成 实现 霓虹发光和像素风的视觉效果。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": "2026-02-27 14:23:12.321000",
+    "episodes": []
+  },
+  {
+    "id": "c7d8d68d-9cec-4f87-9db5-4af0f5c983d7",
+    "source": "662c1eeb-798c-4104-a475-4266308df2ab",
+    "target": "ee4aeead-54f0-45d9-8a97-5c903fb75e98",
+    "relation": "ENABLES",
+    "fact": "阴影 实现 霓虹发光。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0b701d54-5ddf-489c-8576-62b006d8945e",
+    "source": "e3da481b-4694-44a2-b4f4-0feb5b9b7a74",
+    "target": "ee4aeead-54f0-45d9-8a97-5c903fb75e98",
+    "relation": "ENABLES",
+    "fact": "合成 实现 霓虹发光。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "1b7d011a-ba63-4f4b-aa60-a9c4f5ad867f",
+    "source": "662c1eeb-798c-4104-a475-4266308df2ab",
+    "target": "39a1b938-15a7-476e-8d4f-f3a2653d3370",
+    "relation": "ENABLES",
+    "fact": "阴影 实现 像素风。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "871f035d-67e1-4393-9022-46b8c7329c1b",
+    "source": "e3da481b-4694-44a2-b4f4-0feb5b9b7a74",
+    "target": "39a1b938-15a7-476e-8d4f-f3a2653d3370",
+    "relation": "ENABLES",
+    "fact": "合成 实现 像素风。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "d092bf58-2c8d-41ad-81e4-14f967739e60",
+    "source": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "target": "e19f7487-36fb-48db-8471-df96fa8e0f10",
+    "relation": "USES",
+    "fact": "HTML5 Canvas 采用 分层渲染 提升 性能与 清晰度。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "cc7adf0a-f1b8-4246-b3ef-5c7c75bd87f5",
+    "source": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "target": "287d6a91-dbb0-4684-bdd1-541e03dab335",
+    "relation": "USES",
+    "fact": "HTML5 Canvas 使用 requestAnimationFrame。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b41f69be-3462-4be1-81ba-827fc424cf71",
+    "source": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "target": "9b36428b-2e5d-4c99-a2d0-63c4f4ca2a38",
+    "relation": "USES",
+    "fact": "HTML5 Canvas 使用 离屏画布。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "6c0b50df-4fcf-4463-a300-ee0d7715643e",
+    "source": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "target": "9970faf5-824d-41cc-9e4c-1ded345271ab",
+    "relation": "USES",
+    "fact": "HTML5 Canvas 使用 高 DPI 处理。",
+    "valid_at": "2026-02-27 14:23:12",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "0a321036-dc34-4c4f-b1f7-f71462a9b077",
+    "source": "54d62d48-fb3b-451d-b7c3-7ac428236359",
+    "target": "573b8a56-17ab-463a-af75-2950aaba1770",
+    "relation": "USES",
+    "fact": "HTML5 Canvas 使用 阴影与合成 实现霓虹发光和像素风效果",
+    "valid_at": "2026-02-27 14:23:12.321000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "4f307f97-dbd2-4dbb-a6b0-ff8031deb3ee",
+    "source": "de5f1952-bae3-4d1c-81f6-6c7e7b77fbe2",
+    "target": "0d71fd58-16b2-498b-a1de-a374f2640f0b",
+    "relation": "INCLUDES",
+    "fact": "UI 设计规范 附带 性能与可维护性建议",
+    "valid_at": "2026-02-27 14:23:12.321000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "b5634db9-f58f-4b6c-bf0e-ac570d97678d",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "2271bc81-c575-4c13-8ce0-94a1ac307f95",
+    "relation": "IMPROVES",
+    "fact": "推动前端 UI/UX 的改进。",
+    "valid_at": "2026-02-27 14:27:55.059000",
+    "invalid_at": null,
+    "episodes": []
+  },
+  {
+    "id": "965b75d8-3d6a-415e-ac73-3b7512873468",
+    "source": "b9cec88d-a6e4-4899-8df1-f5e181e98cc5",
+    "target": "95104679-81c3-4162-8b1e-d8677026bfcc",
+    "relation": "IMPROVES",
+    "fact": "对前端 TypeScript/React 项目的问题进行诊断和修复以提升开发环境的稳定性。",
+    "valid_at": "2026-02-27 14:27:55.059000",
+    "invalid_at": null,
+    "episodes": []
+  }
+];
+document.getElementById("node-count").textContent = nodes.length;
+document.getElementById("edge-count").textContent = edges.length;
+
+const colorMap = {"person": "#64e4ff", "tech": "#3a7bff", "document": "#6e5cff", "concept": "#ff8c42", "issue": "#ff4a6b"};
+const typeLabel = {"person": "人物", "tech": "技术 / 工具", "document": "文档 / 文件", "concept": "概念 / 方案", "issue": "问题 / Bug"};
+
+function nodeRadius(d) {
+  const lc = edges.filter(e => e.source === d.id || e.target === d.id
+    || (e.source.id||e.source) === d.id || (e.target.id||e.target) === d.id).length;
+  return Math.max(18, 12 + lc * 3);
+}
+
+const svg = d3.select("#graph-svg");
+const container = svg.append("g");
+svg.call(d3.zoom().scaleExtent([0.2,4]).on("zoom", e => container.attr("transform", e.transform)));
+const width = window.innerWidth - 400, height = window.innerHeight;
+
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(edges).id(d => d.id).distance(140))
+  .force("charge", d3.forceManyBody().strength(-400))
+  .force("center", d3.forceCenter(width/2, height/2))
+  .force("collision", d3.forceCollide().radius(d => nodeRadius(d)+16));
+
+(function computeCurvatures() {
+  const pc = {}, pi = {};
+  edges.forEach(e => {
+    const k = [e.source.id||e.source, e.target.id||e.target].sort().join("||");
+    pc[k] = (pc[k]||0)+1; pi[k] = 0;
+  });
+  edges.forEach(e => {
+    const k = [e.source.id||e.source, e.target.id||e.target].sort().join("||");
+    const t = pc[k], i = pi[k]++;
+    e._curve = t===1 ? 0 : (i-(t-1)/2)*45;
+  });
+})();
+
+const linkGroup = container.append("g");
+const linkPaths = linkGroup.selectAll("path").data(edges).join("path")
+  .attr("fill","none").attr("stroke",d=>d.invalid_at?"#0c1628":"#142240")
+  .attr("stroke-width",d=>d.invalid_at?1:1.5).attr("stroke-dasharray",d=>d.invalid_at?"6 4":"none")
+  .attr("marker-end","url(#arrow)").attr("cursor","pointer")
+  .on("click",(ev,d)=>{ev.stopPropagation();showEdgeDetail(d)})
+  .on("mouseenter",(ev,d)=>highlightEdge(d,true)).on("mouseleave",(ev,d)=>highlightEdge(d,false));
+
+const linkLabels = linkGroup.selectAll("text").data(edges).join("text")
+  .text(d=>d.relation).attr("font-size",8).attr("font-family","'Share Tech Mono',monospace")
+  .attr("fill",d=>d.invalid_at?"#0e1830":"#2a4068").attr("text-anchor","middle").attr("dy",-8)
+  .attr("cursor","pointer").attr("letter-spacing","1px")
+  .on("click",(ev,d)=>{ev.stopPropagation();showEdgeDetail(d)});
+
+const nodeGroup = container.append("g");
+const nodeEls = nodeGroup.selectAll("g").data(nodes).join("g").attr("cursor","grab")
+  .call(d3.drag()
+    .on("start",(ev,d)=>{if(!ev.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y})
+    .on("drag",(ev,d)=>{d.fx=ev.x;d.fy=ev.y})
+    .on("end",(ev,d)=>{if(!ev.active)simulation.alphaTarget(0);d.fx=null;d.fy=null}));
+
+nodeEls.append("circle").attr("r",d=>nodeRadius(d)+8).attr("fill","none")
+  .attr("stroke",d=>colorMap[d.type]||"#888").attr("stroke-width",0.5).attr("stroke-opacity",0.12).attr("stroke-dasharray","4 3");
+nodeEls.append("circle").attr("class","node-main").attr("r",d=>nodeRadius(d))
+  .attr("fill",d=>colorMap[d.type]||"#888").attr("fill-opacity",0.06)
+  .attr("stroke",d=>colorMap[d.type]||"#888").attr("stroke-width",1.5).attr("stroke-opacity",0.7).attr("filter","url(#glow)");
+nodeEls.append("circle").attr("r",d=>nodeRadius(d)*0.22)
+  .attr("fill",d=>colorMap[d.type]||"#888").attr("fill-opacity",0.6).attr("filter","url(#glow)");
+nodeEls.append("text").text(d=>d.label).attr("text-anchor","middle").attr("dy",d=>nodeRadius(d)+20)
+  .attr("fill","#4a6890").attr("font-size",10).attr("font-weight",500)
+  .attr("font-family","'Exo 2','Noto Sans SC',sans-serif").attr("letter-spacing","0.5px");
+
+nodeEls.on("click",(ev,d)=>{ev.stopPropagation();showNodeDetail(d)})
+  .on("mouseenter",(ev,d)=>highlightNode(d,true)).on("mouseleave",(ev,d)=>highlightNode(d,false));
+
+simulation.on("tick",()=>{
+  linkPaths.attr("d",d=>{
+    const dx=d.target.x-d.source.x,dy=d.target.y-d.source.y;
+    if(d._curve===0)return`M${d.source.x},${d.source.y} L${d.target.x},${d.target.y}`;
+    const mx=(d.source.x+d.target.x)/2,my=(d.source.y+d.target.y)/2,len=Math.sqrt(dx*dx+dy*dy)||1;
+    return`M${d.source.x},${d.source.y} Q${mx+(-dy/len*d._curve)},${my+(dx/len*d._curve)} ${d.target.x},${d.target.y}`;
+  });
+  linkLabels.attr("x",d=>{const mx=(d.source.x+d.target.x)/2;if(d._curve===0)return mx;const dx=d.target.x-d.source.x,dy=d.target.y-d.source.y,len=Math.sqrt(dx*dx+dy*dy)||1;return mx+(-dy/len*d._curve)*0.5})
+    .attr("y",d=>{const my=(d.source.y+d.target.y)/2;if(d._curve===0)return my;const dx=d.target.x-d.source.x,dy=d.target.y-d.source.y,len=Math.sqrt(dx*dx+dy*dy)||1;return my+(dx/len*d._curve)*0.5});
+  nodeEls.attr("transform",d=>`translate(${d.x},${d.y})`);
+});
+
+function highlightNode(d,on){
+  const ce=new Set(),cn=new Set([d.id]);
+  edges.forEach(e=>{const s=e.source.id||e.source,t=e.target.id||e.target;if(s===d.id||t===d.id){ce.add(e.id);cn.add(s);cn.add(t)}});
+  if(on){
+    nodeEls.select(".node-main").transition().duration(200).attr("fill-opacity",n=>cn.has(n.id)?0.15:0.015).attr("stroke-opacity",n=>cn.has(n.id)?1:0.06).attr("filter",n=>cn.has(n.id)?"url(#glow-strong)":"none");
+    nodeEls.select("text").transition().duration(200).attr("fill-opacity",n=>cn.has(n.id)?1:0.1).attr("fill",n=>n.id===d.id?"#fff":(cn.has(n.id)?"#6890b8":"#4a6890"));
+    linkPaths.transition().duration(200).attr("stroke",e=>ce.has(e.id)?"#00c8ff":"#060e1a").attr("stroke-opacity",e=>ce.has(e.id)?0.9:0.06).attr("stroke-width",e=>ce.has(e.id)?2.5:1).attr("marker-end",e=>ce.has(e.id)?"url(#arrow-highlight)":"url(#arrow)");
+    linkLabels.transition().duration(200).attr("fill-opacity",e=>ce.has(e.id)?1:0.03);
+  }else{
+    nodeEls.select(".node-main").transition().duration(300).attr("fill-opacity",0.06).attr("stroke-opacity",0.7).attr("filter","url(#glow)");
+    nodeEls.select("text").transition().duration(300).attr("fill-opacity",1).attr("fill","#4a6890");
+    linkPaths.transition().duration(300).attr("stroke",e=>e.invalid_at?"#0c1628":"#142240").attr("stroke-opacity",1).attr("stroke-width",e=>e.invalid_at?1:1.5).attr("marker-end","url(#arrow)");
+    linkLabels.transition().duration(300).attr("fill-opacity",1);
+  }
+}
+function highlightEdge(e,on){
+  if(on){linkPaths.transition().duration(150).attr("stroke",l=>l.id===e.id?"#00c8ff":"#060e1a").attr("stroke-opacity",l=>l.id===e.id?1:0.1).attr("stroke-width",l=>l.id===e.id?3:1);linkLabels.transition().duration(150).attr("fill-opacity",l=>l.id===e.id?1:0.06).attr("fill",l=>l.id===e.id?"#64e4ff":"#2a4068")}
+  else{linkPaths.transition().duration(250).attr("stroke",l=>l.invalid_at?"#0c1628":"#142240").attr("stroke-opacity",1).attr("stroke-width",l=>l.invalid_at?1:1.5);linkLabels.transition().duration(250).attr("fill-opacity",1).attr("fill",l=>l.invalid_at?"#0e1830":"#2a4068")}
+}
+
+const panel=d3.select("#detail-panel"),panelContent=d3.select("#panel-content");
+d3.select("#close-panel").on("click",()=>panel.classed("hidden",true));
+svg.on("click",()=>panel.classed("hidden",true));
+
+function showNodeDetail(d){
+  const c=colorMap[d.type]||"#888";
+  const re=edges.filter(e=>(e.source.id||e.source)===d.id||(e.target.id||e.target)===d.id);
+  let h=`<h2>${d.label}</h2><span class="type-badge" style="background:${c}18;color:${c};border:1px solid ${c}35">${typeLabel[d.type]||d.type}</span>`;
+  h+=`<div class="section-title">摘要 Summary</div><div class="fact-text" style="border-left-color:${c}">${d.summary||'暂无摘要'}</div>`;
+  if(d.details){h+=`<div class="section-title">属性 Properties</div>`;Object.entries(d.details).forEach(([k,v])=>{h+=`<div class="meta-row"><span class="label">${k}</span><span class="value">${v}</span></div>`})}
+  h+=`<div class="section-title">关联事实边 (${re.length})</div>`;
+  re.forEach(e=>{const s=e.source.id||e.source,t=e.target.id||e.target,dir=s===d.id?`→ ${t}`:`← ${s}`;h+=`<div class="edge-list-item" data-edge-id="${e.id}"><span class="rel">${e.relation}</span><span class="target">${dir}</span><div style="margin-top:6px;color:#3a5078;font-size:12px;line-height:1.6">${e.fact}</div></div>`});
+  panelContent.html(h);panel.classed("hidden",false);
+  panelContent.selectAll(".edge-list-item").on("click",function(){const edge=edges.find(e=>e.id===this.getAttribute("data-edge-id"));if(edge)showEdgeDetail(edge)});
+}
+function showEdgeDetail(e){
+  const s=e.source.id||e.source,t=e.target.id||e.target;
+  let h=`<h2 style="font-size:16px;color:#64e4ff">${s} → ${t}</h2><span class="type-badge" style="background:#00c8ff18;color:#64e4ff;border:1px solid #00c8ff35">${e.relation}</span>`;
+  if(e.invalid_at)h+=`<span class="type-badge" style="background:#ff4a4a12;color:#ff6b6b;border:1px solid #ff4a4a30;margin-left:6px">已失效</span>`;
+  h+=`<div class="section-title">事实 Fact</div><div class="fact-text">${e.fact}</div>`;
+  h+=`<div class="section-title">时间信息</div><div class="meta-row"><span class="label">valid_at</span><span class="value">${e.valid_at||'—'}</span></div><div class="meta-row"><span class="label">invalid_at</span><span class="value">${e.invalid_at||'<span style="color:#00c8ff">null (仍有效)</span>'}</span></div>`;
+  h+=`<div class="section-title">关联节点</div><div class="edge-list-item" data-node-id="${s}"><span class="rel">Source</span><span class="target">${s}</span></div><div class="edge-list-item" data-node-id="${t}"><span class="rel">Target</span><span class="target">${t}</span></div>`;
+  panelContent.html(h);panel.classed("hidden",false);
+  panelContent.selectAll(".edge-list-item[data-node-id]").on("click",function(){const n=nodes.find(n=>n.id===this.getAttribute("data-node-id"));if(n)showNodeDetail(n)});
+}
+
+window.addEventListener("resize",()=>{simulation.force("center",d3.forceCenter(window.innerWidth/2,window.innerHeight/2));simulation.alpha(0.3).restart()});
+</script>
+</body>
+</html>

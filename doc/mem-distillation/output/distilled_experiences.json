@@ -1,0 +1,749 @@
+[
+  {
+    "issue_context": "HTTP MCP 认证持续返回 401，即使客户端已在请求头中添加了 Authorization 字段",
+    "root_cause": "Authorization 头缺少 'Bearer ' 前缀和空格，或客户端配置中 headers 写法不符合目标框架（Cursor）的预期格式，导致服务端鉴权中间件无法识别令牌",
+    "solution": "1) 抓取客户端实际发出的原始 HTTP 请求头，确认 Authorization 值格式为 'Bearer <token>'（注意 Bearer 后有空格）；2) 复核 MCP 客户端 JSON 配置中 headers 字段的写法是否与 Cursor 文档一致；3) 在服务端日志中打印收到的请求头用于对比",
+    "rationale": "HTTP Bearer Token 规范（RFC 6750）要求格式严格为 'Bearer <token>'，缺少前缀或空格会导致服务端解析失败。客户端配置层的格式错误比服务端 bug 更难发现，因为错误不会在配置阶段报出，只在运行时体现为 401",
+    "experience_type": "debugging",
+    "related_components": [
+      "HTTP MCP",
+      "Bearer Token 认证",
+      "Cursor MCP 配置",
+      "nginx 反向代理"
+    ],
+    "prevention": "在集成联调前，先用 curl 手动构造带完整 Authorization 头的请求验证服务端鉴权逻辑；客户端配置模板中明确注释 Bearer 前缀和空格要求",
+    "confidence": 0.82,
+    "_hash": "fb007e709d123a5d",
+    "_distilled_at": "2026-04-05T06:38:19.492467Z"
+  },
+  {
+    "issue_context": "现有 MCP 接入被描述为'远程模式'，但实际上仍是本地 stdio 外壳包裹 HTTP 数据源调用，并非真正的远程 MCP 服务",
+    "root_cause": "stdio 传输层本质是父子进程间的标准输入输出通道，天然绑定本地进程生命周期，无法直接跨网络通信；'远程模式'只是在本地进程内部发起 HTTP 请求，客户端侧仍依赖本地进程存在",
+    "solution": "在服务端新增独立的 HTTP MCP 入口（如 /api/mcp），复用现有工具逻辑，采用无状态 JSON 响应模式，通过 nginx 反向代理对外暴露，客户端配置改为直连该 HTTP 端点并携带 Bearer Token",
+    "rationale": "HTTP 模式天然支持远程访问、多客户端并发、网关统一鉴权，且无状态 JSON 模式比 SSE 对反向代理配置要求更低（SSE 需要代理支持长连接和禁用缓冲）。在开发环境优先选 JSON 模式可以最小化运维改动成本，待稳定后再评估是否需要 SSE 流式能力",
+    "experience_type": "architecture",
+    "related_components": [
+      "MCP stdio 传输",
+      "MCP HTTP 传输",
+      "nginx 反向代理",
+      "Cursor MCP 配置"
+    ],
+    "prevention": "在方案设计阶段明确区分'传输层'概念：stdio=本地进程间通信，HTTP=网络通信；凡是需要多人共享或远程部署的 MCP 服务，从立项起就应选择 HTTP 传输层",
+    "confidence": 0.92,
+    "_hash": "6ff05a16d43f85c2",
+    "_distilled_at": "2026-04-05T06:38:19.494051Z"
+  },
+  {
+    "issue_context": "MCP initialize 握手请求失败，排查发现问题不在服务未启动，而在请求格式：接口对 Accept 头和 JSON body 格式较敏感",
+    "root_cause": "MCP 协议的 initialize 请求要求特定的 Content-Type 和 Accept 头（通常需要 application/json），且 JSON body 结构需严格符合协议规范；任一字段缺失或格式错误都会导致握手失败，错误表现与服务不可达类似，容易误判",
+    "solution": "1) 确保请求头包含 Content-Type: application/json 和 Accept: application/json；2) 确保 Authorization: Bearer <token> 格式正确；3) 用 curl 手动构造标准 initialize 请求体进行逐步验证，先排除格式问题再排查业务逻辑",
+    "rationale": "协议握手阶段的失败原因多样（认证、格式、网络），从最简单的 curl 手动测试开始可以快速隔离变量，避免在客户端配置层反复调试",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP HTTP 协议",
+      "initialize 握手",
+      "HTTP 请求头",
+      "curl 调试"
+    ],
+    "prevention": "为 MCP HTTP 端点编写一个标准的 curl 测试脚本并纳入仓库，包含完整的请求头和最小化 initialize body，作为联调基准工具",
+    "confidence": 0.85,
+    "_hash": "c0a8a39922ed09db",
+    "_distilled_at": "2026-04-05T06:38:19.494126Z"
+  },
+  {
+    "issue_context": "SSE（Server-Sent Events）模式的 MCP 在经过 nginx 反向代理时需要额外配置，而普通 JSON/HTTP 模式则无此问题",
+    "root_cause": "SSE 依赖长连接和服务端持续推送，nginx 默认会缓冲响应体并设置连接超时，导致 SSE 流被截断或延迟；需要显式配置 proxy_buffering off、proxy_read_timeout 等指令",
+    "solution": "在开发和初期部署阶段优先选择无状态 HTTP JSON 模式；若必须使用 SSE，需在 nginx 配置中为对应 location 块添加：proxy_buffering off; proxy_cache off; proxy_read_timeout 3600s; chunked_transfer_encoding on;",
+    "rationale": "JSON 模式每次请求独立完成，与普通 REST API 无异，对代理层零额外要求；SSE 模式虽然支持流式输出，但增加了运维复杂度。在功能等价的情况下，优先选择运维成本更低的方案",
+    "experience_type": "configuration",
+    "related_components": [
+      "nginx 反向代理",
+      "SSE",
+      "MCP HTTP 传输",
+      "长连接"
+    ],
+    "prevention": "技术选型时将'是否经过反向代理'作为评估 SSE vs JSON 模式的关键因素；在架构文档中注明 SSE 模式的 nginx 配置要求",
+    "confidence": 0.88,
+    "_hash": "5c04428a364fd77a",
+    "_distilled_at": "2026-04-05T06:38:19.494141Z"
+  },
+  {
+    "issue_context": "将 MCP 服务对外共享给其他用户（如 yuantongliu）时，对方持续无法接入，但服务端链路本身验证正常",
+    "root_cause": "问题不在服务端整体可用性，而在用户侧的个人令牌有效性、项目成员权限范围，或客户端 JSON 配置写法错误；服务端正常但用户侧任一环节缺失都会导致接入失败",
+    "solution": "排查顺序：1) 确认对方个人令牌是否有效且未过期；2) 确认对方账号是否已被添加为项目成员并具备相应权限；3) 对比对方的客户端 JSON 配置与标准模板是否一致；4) 让对方用 curl 手动测试以隔离客户端工具问题",
+    "rationale": "多用户接入场景下，服务端可用性和用户侧配置是两个独立的故障域。先用服务端自测确认链路正常，再按'令牌→权限→配置'顺序逐步排查用户侧，可以避免在服务端做无效改动",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP HTTP 接入",
+      "Bearer Token",
+      "用户权限管理",
+      "多用户接入"
+    ],
+    "prevention": "对外提供 MCP 服务时，准备一份标准接入文档，包含：示例 JSON 配置、URL、必需请求头、令牌获取方式、权限申请流程，以及一个可直接复制的 curl 验证命令",
+    "confidence": 0.87,
+    "_hash": "450060a1104f0d08",
+    "_distilled_at": "2026-04-05T06:38:19.494156Z"
+  },
+  {
+    "issue_context": "记忆搜索功能无法跨用户检索，只能查到当前用户自己的记忆，导致'按他人身份/范围检索工作记忆'的需求无法满足",
+    "root_cause": "记忆搜索的后端查询逻辑中存在用户范围限制，查询条件隐式绑定了当前登录用户，未开放跨用户查询参数",
+    "solution": "修改记忆搜索后端逻辑，将用户范围从隐式当前用户改为显式可传参，支持传入目标用户标识（如 minusjiang）和仓库范围（如 dpar）作为查询条件；同时确认主数据库与影子数据库的数据完整性（部分影子库为空）",
+    "rationale": "工作记忆的核心使用场景之一是团队协作中查看他人进展，若搜索范围强制绑定当前用户则该场景完全不可用；显式参数化用户范围是最小改动且语义最清晰的修复方式",
+    "experience_type": "debugging",
+    "related_components": [
+      "记忆搜索",
+      "后端查询逻辑",
+      "跨用户权限",
+      "数据库"
+    ],
+    "prevention": "在设计多用户系统的搜索/查询接口时，明确区分'默认范围'（当前用户）和'可选范围'（指定用户/组织），并在接口设计阶段就暴露范围参数",
+    "confidence": 0.78,
+    "_hash": "7a647d70dc69b11c",
+    "_distilled_at": "2026-04-05T06:38:19.494170Z"
+  },
+  {
+    "issue_context": "用户 yuantongliu 配置 MCP 后持续收到 401 未授权错误，服务端日志中也未出现该用户的请求记录",
+    "root_cause": "Authorization 请求头缺少 Bearer 前缀。服务端 validateApiToken 首先执行 startsWith('Bearer ') 检查，令牌值直接传入时该检查失败，函数返回 null，导致所有请求在鉴权阶段即被拒绝，请求甚至不会进入业务日志",
+    "solution": "将 Authorization 配置从裸 token 改为 'Bearer <token>' 格式。即在 ~/.cursor/mcp.json 的 headers 中写 \"Authorization\": \"Bearer <token>\"",
+    "rationale": "HTTP Bearer Token 规范（RFC 6750）要求 Authorization 头必须包含 'Bearer ' 前缀，服务端严格按此校验。日志中无请求记录是因为鉴权失败发生在请求进入业务逻辑之前，这是排查此类问题时的重要线索",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP HTTP API",
+      "validateApiToken",
+      "Cursor mcp.json"
+    ],
+    "prevention": "在接入文档中明确标注 Authorization 头的完整格式示例（含 Bearer 前缀），并在鉴权失败时返回更具体的错误信息（如 'missing Bearer prefix'）而非通用 401，降低排查成本",
+    "confidence": 0.95,
+    "_hash": "c019bd97ecc64219",
+    "_distilled_at": "2026-04-05T06:39:11.868038Z"
+  },
+  {
+    "issue_context": "Cursor 客户端界面持续显示红色错误，误导排查者认为 MCP 服务不可用；同时日志中大量 GET /api/mcp 请求造成噪音干扰",
+    "root_cause": "Cursor 在无状态模式下会反复发起 GET /api/mcp 尝试建立 SSE 长连接，这些探测请求虽返回 200 但在 UI 上表现为红色报错。这是客户端行为，与 MCP 工具调用（POST）完全独立，不影响实际业务功能",
+    "solution": "排查 MCP 可用性时，应以实际 POST 工具调用的结果为准，忽略 GET /api/mcp 的 SSE 建连探测噪音。可通过查看是否有成功的工具调用响应来确认服务是否真正可用",
+    "rationale": "SSE 连接探测与工具调用是两条独立链路。UI 红色报错来自 SSE 建连失败，但 MCP 的核心功能通过 POST 请求实现，两者互不影响。混淆两者会导致误判服务不可用",
+    "experience_type": "debugging",
+    "related_components": [
+      "Cursor MCP Client",
+      "SSE",
+      "MCP HTTP API"
+    ],
+    "prevention": "建立 MCP 可用性验证的标准步骤：先执行一次实际工具调用并检查响应，而非依赖 UI 状态指示灯或 SSE 连接状态",
+    "confidence": 0.9,
+    "_hash": "3c016b07962b75b1",
+    "_distilled_at": "2026-04-05T06:39:11.868061Z"
+  },
+  {
+    "issue_context": "search_knowledge 工具调用返回空数组 []，排查者误以为 MCP 服务故障",
+    "root_cause": "空结果是数据层面的正常响应——对应知识库中确实不存在 PAK 相关内容，而非 MCP 服务本身异常。工具选择也存在问题：PAK 内容应通过 search_memory_like 检索记忆数据，而非 search_knowledge 检索知识库",
+    "solution": "区分两类查询工具的适用场景：search_knowledge 用于结构化知识库内容，search_memory_like 用于历史记忆/上下文数据。针对记忆类内容改用 search_memory_like",
+    "rationale": "空结果与服务故障是两种完全不同的失败模式，需要通过检查服务健康状态（日志、响应码）与数据存在性（换工具/换关键词）来区分。工具选择错误会导致即使数据存在也始终查不到",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP Tools",
+      "search_knowledge",
+      "search_memory_like"
+    ],
+    "prevention": "在工具调用文档中明确区分 search_knowledge 与 search_memory_like 的数据源范围；排查查询无结果时，优先确认工具选择是否正确，再考虑数据不存在或服务故障",
+    "confidence": 0.88,
+    "_hash": "a5431e0c4d939f27",
+    "_distilled_at": "2026-04-05T06:39:11.868070Z"
+  },
+  {
+    "issue_context": "MCP 的 get_projects 接口返回项目列表不完整，部分用户（如 ziyadyao）通过前端能看到的项目（如 tank）在 MCP 侧不可见，导致 AI Agent 无法访问对应项目上下文",
+    "root_cause": "get_projects 实现过度依赖 shadow 机制作为项目可见性的判断条件。对于「有项目权限但未创建过 shadow」的用户，查询逻辑无法正确枚举其可访问项目。此外子项目（如 tank 作为子项目）的枚举逻辑存在缺失，导致前端可见但接口侧不返回",
+    "solution": "按「有项目权限即可返回」原则重写 get_projects 查询逻辑，统一覆盖：1）用户创建的项目；2）用户被邀请加入的项目；3）用户所在组织下的项目。引入 ProjectAccessService 统一收敛权限判断逻辑，解耦对 shadow 的强依赖",
+    "rationale": "项目可见性应与权限模型严格对齐，而非依赖历史实现中的 shadow 关联关系。组织应视为项目的封装层而非独立筛选条件。将分散的权限判断收敛到统一服务，可避免各接口口径不一致导致的可见性漏洞",
+    "experience_type": "architecture",
+    "related_components": [
+      "MCP get_projects",
+      "ProjectAccessService",
+      "shadow机制",
+      "组织/项目权限模型"
+    ],
+    "prevention": "设计项目枚举接口时，以权限模型为唯一数据源，避免引入 shadow 等中间状态作为可见性判断依据。上线前补充「无 shadow 用户」「组织成员」「直接项目成员」等边界场景的集成测试",
+    "confidence": 0.85,
+    "_hash": "eb6fbad368d4747c",
+    "_distilled_at": "2026-04-05T06:39:11.868080Z"
+  },
+  {
+    "issue_context": "原有 MCP 架构采用「本地 stdio 进程 → fetch 远端 API」的中转方案，在 HTTP MCP 直连模式上线后该中转层成为冗余",
+    "root_cause": "stdio MCP 无法跨网络，最初为解决网络隔离问题而设计了本地 stdio 进程作为代理中转远端 API 的架构。HTTP MCP 直连方案上线后，该限制不再存在，中转层失去存在价值",
+    "solution": "逐步停止维护 shadowfolk-query-mcp npm 包，清理 server.ts 中 isRemoteMode 与 callRemote 相关遗留逻辑。HTTP MCP 稳定验证后再执行最终清理，无需立即删除（保留离线调试场景的降级能力）",
+    "rationale": "HTTP MCP 直连将接入成本从「安装 Node.js 环境 + clone 仓库 + npm install」降低为「粘贴一段 JSON 配置」，大幅简化分发流程。保留冗余中转层会增加维护负担并造成架构理解混乱",
+    "experience_type": "architecture",
+    "related_components": [
+      "stdio MCP",
+      "HTTP MCP",
+      "shadowfolk-query-mcp",
+      "server.ts"
+    ],
+    "prevention": "架构演进时明确标记被替代方案的废弃时间线，避免两套方案长期并存导致维护成本累积。新方案稳定后设置明确的清理 deadline",
+    "confidence": 0.87,
+    "_hash": "7bae9d83b8945f95",
+    "_distilled_at": "2026-04-05T06:39:11.868090Z"
+  },
+  {
+    "issue_context": "需要将 ShadowFolk MCP 服务分发给多名用户接入，原 stdio 方案要求每个用户本地安装依赖环境",
+    "root_cause": "stdio 模式的 MCP 需要本地运行进程，依赖 Node.js 环境和 npm 包安装，分发成本高且容易因环境差异出错",
+    "solution": "切换为 HTTP MCP 模式：用户在网页端生成 API Token，在 ~/.cursor/mcp.json 中添加如下配置即可完成接入：{\"mcpServers\": {\"shadow-folk\": {\"url\": \"http://<host>:8080/api/mcp\", \"headers\": {\"Authorization\": \"Bearer <token>\"}}}}",
+    "rationale": "HTTP MCP 将服务端能力通过网络暴露，客户端只需配置 URL 和认证头，无需任何本地依赖。这将接入门槛从环境配置问题转化为纯配置问题，显著降低分发和支持成本",
+    "experience_type": "configuration",
+    "related_components": [
+      "HTTP MCP",
+      "Cursor mcp.json",
+      "API Token"
+    ],
+    "prevention": "优先设计 HTTP 模式的 MCP 服务，仅在有明确离线/本地直连需求时才引入 stdio 模式。接入文档提供完整可复制的配置示例",
+    "confidence": 0.92,
+    "_hash": "9622d922bc267e59",
+    "_distilled_at": "2026-04-05T06:39:11.868100Z"
+  },
+  {
+    "issue_context": "通过 SSH 在远程主机上执行 MCP HTTP 接口测试时，bash 脚本因包含 CRLF 换行符导致 curl 的 -H、-d 等参数被解释为独立命令，测试用例（initialize、invalid token、tools/list）均未正确执行，尽管 authz success 行出现在输出中",
+    "root_cause": "测试脚本在 Windows 环境下编辑后通过 SCP 上传到 Linux 远程主机，文件保留了 CRLF 行尾，导致 bash 解析时将 \\r 作为命令名的一部分，行继续符失效，多行 curl 命令被拆散",
+    "solution": "上传脚本后在远程端用 sed 去除 CRLF：`sed -i 's/\\r//' /tmp/test-mcp.sh`，再执行脚本；或在上传前在本地用 dos2unix 转换",
+    "rationale": "Windows 编辑器默认使用 CRLF，而 Linux bash 不容忍行尾 \\r，跨平台传输脚本时必须显式处理换行符格式，否则会产生难以直观察觉的解析错误",
+    "experience_type": "cross_platform",
+    "related_components": [
+      "bash",
+      "SCP",
+      "SSH",
+      "curl",
+      "MCP HTTP endpoint"
+    ],
+    "prevention": "在 CI/CD 或手动部署流程中，凡是从 Windows 环境生成并上传到 Linux 的 shell 脚本，统一在上传步骤后追加 `sed -i 's/\\r//' <script>` 或在 Git 仓库中配置 .gitattributes 强制 LF",
+    "confidence": 0.92,
+    "_hash": "c941c2a631db2c7d",
+    "_distilled_at": "2026-04-05T06:39:53.548978Z"
+  },
+  {
+    "issue_context": "尝试通过 PowerShell → SSH → docker exec → Node 内联代码的多层嵌套方式向容器内 /api/mcp 发送 JSON-RPC initialize 请求，结果 PowerShell 层对命令字符串的解析出错，远程 HTTP 请求从未实际执行；另一次尝试用 SSH 内嵌 Python one-liner 生成 JSON 文件，因 shell 转义破坏了 Python 语法，抛出 SyntaxError",
+    "root_cause": "PowerShell、SSH、远程 shell、Node/Python 各层均有独立的引号和转义规则，嵌套超过两层后单引号、双引号、反斜杠的语义会相互干扰，导致最终命令字符串面目全非",
+    "solution": "将测试逻辑写入本地脚本文件（如 test-mcp.sh），通过 SCP 上传到远程 /tmp 后直接执行，避免在 SSH 命令行内嵌套多层引号；JSON payload 同样写入文件再用 curl -d @file 引用，而非内联在命令行中",
+    "rationale": "文件传输 + 远程执行的模式将'内容'与'命令'解耦，每一层只需处理自己的转义边界，复杂度从 O(n²) 降为 O(n)；内联多层嵌套则让每个特殊字符都需要在所有层同时正确转义，极易出错且难以调试",
+    "experience_type": "debugging",
+    "related_components": [
+      "PowerShell",
+      "SSH",
+      "bash",
+      "docker exec",
+      "curl",
+      "JSON-RPC"
+    ],
+    "prevention": "制定团队规范：凡需要在远程容器/主机执行超过 2 行的逻辑，必须先写成脚本文件上传再执行，禁止在 SSH 命令行内内联复杂逻辑",
+    "confidence": 0.93,
+    "_hash": "c5be15fa47268f05",
+    "_distilled_at": "2026-04-05T06:39:53.549003Z"
+  },
+  {
+    "issue_context": "MCP HTTP 端点收到 curl POST 请求后返回 JSON parse error，但 authz success 已出现，说明鉴权通过，问题出在请求体",
+    "root_cause": "通过 shell here-document 或 printf 写入 /tmp/mcp_test.json 的 JSON 内容因转义问题格式损坏（重度转义或结构不完整），curl 用 -d @file 发送后服务端无法解析",
+    "solution": "在发送前先 `cat /tmp/mcp_test.json` 肉眼核验内容，确认是合法 JSON；同时为 curl 请求添加 `-H 'Content-Type: application/json'` 头，确保服务端以 JSON 模式解析 body",
+    "rationale": "JSON parse error 与 auth error 是两个独立的错误路径，auth 成功只能排除鉴权问题，不能排除 body 问题；在调试链路中应逐层隔离验证，先确认文件内容再发送请求",
+    "experience_type": "debugging",
+    "related_components": [
+      "curl",
+      "MCP HTTP endpoint",
+      "JSON-RPC",
+      "bash"
+    ],
+    "prevention": "测试脚本中在 curl 调用前加入 `jq . /tmp/mcp_test.json` 校验步骤，若 jq 报错则中止，避免发送损坏的 payload 产生误导性错误",
+    "confidence": 0.88,
+    "_hash": "a9f2c94d2c96272f",
+    "_distilled_at": "2026-04-05T06:39:53.549014Z"
+  },
+  {
+    "issue_context": "shadow-folk MCP 服务原本以 stdio 方式在 Cursor 本地启动，需要改造为可通过 HTTP 远程访问，以便多客户端共享同一服务实例并支持 Bearer token 鉴权",
+    "root_cause": "stdio 模式要求客户端本地有可执行文件和运行环境，无法跨机器共享，也不便于统一鉴权管理",
+    "solution": "新增 packages/server/src/mcp/http.ts，使用 WebStandardStreamableHTTPServerTransport 的无状态 JSON 模式暴露 /api/mcp 端点；新增 tools.ts 统一 13 个工具定义，新增 handlers.ts 处理 CallTool 逻辑并通过 Token 获取身份；在 index.ts 中于 TOF 中间件之前挂载该路由；Cursor 客户端配置从 stdio 命令改为 url + headers（Bearer token）格式",
+    "rationale": "HTTP 无状态模式与现有 Nginx 反向代理天然兼容，无需额外端口；Bearer token 鉴权与现有 API 鉴权体系统一；工具定义集中在 tools.ts 避免 stdio 和 HTTP 两条路径重复维护",
+    "experience_type": "architecture",
+    "related_components": [
+      "MCP SDK",
+      "WebStandardStreamableHTTPServerTransport",
+      "Nginx",
+      "Cursor MCP config",
+      "Bearer token auth",
+      "Node.js"
+    ],
+    "prevention": "新增 MCP transport 时应同步更新集成测试脚本，覆盖 initialize、invalid token 拒绝、tools/list 三个基础场景，作为部署验收门禁",
+    "confidence": 0.9,
+    "_hash": "03e948953557ce27",
+    "_distilled_at": "2026-04-05T06:39:53.549025Z"
+  },
+  {
+    "issue_context": "远程 MCP /api/mcp 接口调用返回 401 Unauthorized，但日志中出现 'authz success'，说明某一层鉴权通过但应用层仍拒绝请求。错误提示为'请先登录 TOF 认证中心或提供有效 API Token'。",
+    "root_cause": "该服务存在分层鉴权机制：外层（如反向代理或前置中间件）的 authz 检查与应用层的 TOF 认证中间件是独立的。'authz success' 来自外层，而 /api/mcp 路由挂载在 TOF auth 中间件之后，要求有效的 TOF 登录态或特定格式的 API Token，普通 Bearer Token 不被接受。",
+    "solution": "1. 阅读服务端 index.ts 确认路由挂载顺序，区分哪些接口走 TOF auth（如 /api/mcp），哪些走独立 Bearer Token（如 /api/push）。2. 对于 /api/mcp，需使用 TOF 认证中心颁发的有效 session token，而非自定义 Bearer Token。3. 若需用 Bearer Token 访问 MCP，需参考 /api/push 的实现方式单独配置认证路径。",
+    "rationale": "日志中的 'authz success' 极易误导排查方向，让人以为鉴权已通过。实际上该日志来自前置代理层而非应用层，两层鉴权逻辑完全独立。必须区分'网络层/代理层鉴权'与'应用层业务鉴权'，否则会在错误的层面上浪费排查时间。",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP HTTP endpoint",
+      "TOF auth middleware",
+      "Hono server",
+      "Bearer Token auth",
+      "tof-auth.ts",
+      "middleware/auth-helper.ts"
+    ],
+    "prevention": "在服务端日志中为不同鉴权层添加明确标识（如 [proxy-authz] vs [app-authz]），避免混淆。同时在 API 文档或注释中明确标注每个路由所使用的鉴权方式。",
+    "confidence": 0.88,
+    "_hash": "af72d04ae90fa1e5",
+    "_distilled_at": "2026-04-05T06:40:40.034472Z"
+  },
+  {
+    "issue_context": "curl 发送 MCP initialize 请求时被服务端以 'invalid JSON' 拒绝，但鉴权已通过，说明问题在请求体序列化而非连通性或认证。",
+    "root_cause": "在 shell 中通过 SSH 执行 curl 命令时，JSON 字符串中的引号和特殊字符在多层 shell 解析（本地 shell → SSH → 远程 shell）过程中发生转义错误，导致服务端收到的请求体不是合法 JSON。",
+    "solution": "使用 heredoc 或将 JSON 写入临时文件后用 curl -d @file 方式传递，避免多层 shell 引号嵌套问题。或使用 Python/jq 等工具在远端生成 JSON 后管道传给 curl。",
+    "rationale": "SSH 远程执行 + shell 引号嵌套是经典的转义陷阱。JSON 中的双引号在 bash 中需要转义，而通过 SSH 传递时又多一层 shell 解析，极易出错。将数据与命令分离是最可靠的解决方案。",
+    "experience_type": "debugging",
+    "related_components": [
+      "curl",
+      "SSH remote execution",
+      "JSON-RPC",
+      "MCP HTTP endpoint"
+    ],
+    "prevention": "调试远程 API 时，优先使用 --data-binary @/tmp/payload.json 方式传递请求体，或在远端直接用 Python requests/httpie 等工具，避免 shell 引号地狱。",
+    "confidence": 0.85,
+    "_hash": "0659c1f05e6a18c1",
+    "_distilled_at": "2026-04-05T06:40:40.034493Z"
+  },
+  {
+    "issue_context": "MCP initialize 请求被服务端拒绝，错误原因为客户端未同时声明支持 application/json 和 text/event-stream，属于 Content Negotiation 失败。",
+    "root_cause": "MCP Streamable HTTP 协议要求客户端在 Accept 头中同时声明 application/json 和 text/event-stream，服务端据此决定响应格式。仅设置 Content-Type 而不设置 Accept 头会导致协议协商失败。",
+    "solution": "curl 请求需添加：-H 'Accept: application/json, text/event-stream'，同时保留 -H 'Content-Type: application/json'。",
+    "rationale": "MCP Streamable HTTP 是一种混合协议，服务端可能以 JSON 或 SSE 流两种格式响应，客户端必须通过 Accept 头声明两者都支持，否则服务端无法选择合适的响应格式。这是协议规范要求，不是服务端的特殊实现。",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP HTTP endpoint",
+      "Streamable HTTP",
+      "curl",
+      "Content Negotiation"
+    ],
+    "prevention": "调试 MCP HTTP 接口时，标准请求头模板应包含：Content-Type: application/json 和 Accept: application/json, text/event-stream，将此作为 MCP 调试的标准 curl 模板。",
+    "confidence": 0.9,
+    "_hash": "0f1ce93ce06f5ade",
+    "_distilled_at": "2026-04-05T06:40:40.034503Z"
+  },
+  {
+    "issue_context": "DEV 环境部署失败，Docker 镜像构建阶段报错：lockfile 与 package.json 不一致，pnpm install --frozen-lockfile 无法执行。错误发生在代码从 commit 6018385 更新到 2f7bcf3 之后。",
+    "root_cause": "开发者在本地修改了 server 包的 package.json（新增或升级了 MCP 相关依赖），但未重新运行 pnpm install 生成新的 pnpm-lock.yaml，或生成后未将 lockfile 一并提交。Docker 构建环境使用 --frozen-lockfile 模式，严格要求 lockfile 与 manifest 一致。",
+    "solution": "1. 本地运行 pnpm install 重新生成 lockfile。2. 将 pnpm-lock.yaml 与 package.json 的变更一同提交（如本例中的 'chore: update lockfile for modelcontextprotocol/sdk 1.28.0'）。3. 推送后重新触发部署。",
+    "rationale": "容器化构建环境使用 frozen-lockfile 是最佳实践，确保构建可重现。但这要求开发者在每次修改依赖后必须同步提交 lockfile。lockfile 与 manifest 分离提交是常见的工程失误，尤其在 monorepo 中更容易遗漏。",
+    "experience_type": "deployment",
+    "related_components": [
+      "pnpm",
+      "pnpm-lock.yaml",
+      "Docker",
+      "docker-compose",
+      "CI/CD",
+      "monorepo"
+    ],
+    "prevention": "1. 在 CI/pre-push hook 中添加 pnpm install --frozen-lockfile 检查，本地即可发现 lockfile 不一致。2. 在 PR checklist 中明确要求：修改 package.json 必须同时提交 lockfile。3. 考虑在 git commit hook 中检测 package.json 变更时是否同步更新了 lockfile。",
+    "confidence": 0.95,
+    "_hash": "d8c06a1bcfc179d0",
+    "_distilled_at": "2026-04-05T06:40:40.034514Z"
+  },
+  {
+    "issue_context": "在 PowerShell 环境中执行 'git add pnpm-lock.yaml && git commit ...' 命令失败，报错 ParserError: InvalidEndOfLine，命令未执行。",
+    "root_cause": "PowerShell 不支持 && 作为命令链接符（这是 bash/sh 的语法）。PowerShell 使用分号 ; 或管道 | 连接命令，&& 会被解析为语法错误。",
+    "solution": "在 PowerShell 中将命令拆分为两条独立执行：先 git add pnpm-lock.yaml，再 git commit ...。或使用 PowerShell 的 -and 逻辑，或切换到 Git Bash / WSL 环境执行。",
+    "rationale": "Windows PowerShell 与 Unix shell 的命令语法存在根本差异，&& 在 PowerShell 5.x 中不被支持（PowerShell 7+ 才部分支持）。跨平台脚本需要针对目标 shell 环境适配语法。",
+    "experience_type": "cross_platform",
+    "related_components": [
+      "PowerShell",
+      "Git",
+      "Windows",
+      "shell scripting"
+    ],
+    "prevention": "在 Windows 开发环境中，优先使用 Git Bash 或 WSL 执行 shell 脚本，避免 PowerShell 与 bash 语法混用。若必须用 PowerShell，将复合命令拆分为多行执行。",
+    "confidence": 0.97,
+    "_hash": "4e59faeb29addded",
+    "_distilled_at": "2026-04-05T06:40:40.034523Z"
+  },
+  {
+    "issue_context": "在 PowerShell 环境中执行 git commit 命令时，使用了 Bash heredoc 语法（<<EOF ... EOF）和命令替换语法（$(...)）来构造多行提交信息，导致命令执行失败。",
+    "root_cause": "PowerShell 不支持 Bash 的 heredoc 语法和 $() 命令替换。这两种语法是 Bash/sh 特有的，在 PowerShell 中会被解析为不同含义或直接报错。跨 shell 环境执行脚本时，语法兼容性是常见陷阱。",
+    "solution": "在 PowerShell 中构造多行 git commit 信息时，改用以下方式之一：1) 使用 PowerShell 的 here-string 语法 @'....'@；2) 使用 -m 参数多次传入（git commit -m '标题' -m '正文'）；3) 将提交信息写入临时文件后用 git commit -F <file> 读取。",
+    "rationale": "不同 shell 环境的语法差异是跨平台开发中的常见问题。Windows 开发环境默认使用 PowerShell，而很多 CI/CD 脚本和开发习惯来自 Unix/Bash 背景。识别当前执行环境并选择对应语法是最直接的解决方式，而非强行统一 shell 环境。",
+    "experience_type": "cross_platform",
+    "related_components": [
+      "git",
+      "PowerShell",
+      "Bash",
+      "CI/CD脚本"
+    ],
+    "prevention": "在 Windows 开发环境中，避免直接复用 Bash 脚本片段。可以在项目中维护 PowerShell 版本的常用脚本，或使用 Git Bash / WSL 作为统一的命令执行环境，并在团队文档中明确说明推荐的 shell 环境。",
+    "confidence": 0.92,
+    "_hash": "c44f64f242bdbafc",
+    "_distilled_at": "2026-04-05T06:41:12.148647Z"
+  },
+  {
+    "issue_context": "MCP 服务原先通过本地 stdio 进程（shadowfolk-query-mcp）转发请求到开发服 API，要求客户端（Cursor）本地安装 Node/npm 并运行本地进程，接入门槛高且依赖链复杂。",
+    "root_cause": "stdio 模式的 MCP 接入强依赖本地运行时环境，每个客户端都需要独立维护本地进程，无法复用服务端已有的鉴权体系，且本地进程与服务端之间存在额外的 HTTP 转发跳数。",
+    "solution": "在服务端新增 HTTP MCP 入口（packages/server/src/mcp/http.ts），实现 POST /api/mcp 端点，使用 Bearer Token 鉴权（复用现有 validateApiToken），采用无状态 HTTP transport（sessionIdGenerator 设为 undefined，enableJsonResponse 设为 true）。将原 stdio server.ts 中的工具定义和调用处理抽离到 tools.ts 与 handlers.ts，供 stdio 和 HTTP 两个入口共享，避免实现分叉。身份信息严格从 Token 中解析 personId，不信任工具参数中传入的身份。",
+    "rationale": "HTTP 模式消除了客户端本地依赖，Cursor 可直接 POST 到开发服，复用现有鉴权体系降低安全风险。无状态设计使每次请求独立创建 Server 实例，简化了会话管理复杂度，适合工具调用这类短生命周期请求。工具逻辑抽离到共享模块避免了两套实现的维护负担。保持 stdio 版本不变则确保了向后兼容性。",
+    "experience_type": "architecture",
+    "related_components": [
+      "MCP",
+      "HTTP transport",
+      "Bearer Token认证",
+      "JSON-RPC",
+      "stdio",
+      "packages/server/src/mcp/"
+    ],
+    "prevention": "在设计协议接入层时，优先考虑将业务逻辑（工具定义、处理器）与传输层（stdio/HTTP）解耦，使传输层可替换。鉴权逻辑应集中在传输层入口处理，不应依赖业务参数中的身份信息。",
+    "confidence": 0.88,
+    "_hash": "d6b8c81b82d4fa2d",
+    "_distilled_at": "2026-04-05T06:41:12.148674Z"
+  },
+  {
+    "issue_context": "TypeScript 编译检查暴露了 MCP 请求处理器返回类型、服务层可空性（nullability）以及 task/batch schema 或模型定义之间的类型不匹配错误，导致项目无法通过编译。",
+    "root_cause": "在将 MCP 工具逻辑从 server.ts 抽离到 tools.ts/handlers.ts 的重构过程中，接口契约（返回类型、可空类型处理）未能在新的模块边界上保持一致，服务层返回的可空值未被正确处理，且 task/batch 相关的 schema 定义与实际使用的模型类型存在偏差。",
+    "solution": "针对各类错误逐一修正：1) 对齐 MCP handler 的返回类型与 MCP SDK 期望的类型签名；2) 在服务层调用处添加 null/undefined 守卫或使用非空断言（在确认安全的情况下）；3) 检查 task/batch schema 定义与 TypeScript 类型定义的一致性并修正偏差。",
+    "rationale": "模块拆分重构时，TypeScript 的严格类型检查会在编译期暴露隐藏的接口契约问题，这比运行时发现要好得多。在重构后立即运行 tsc 检查是验证模块边界正确性的有效手段。",
+    "experience_type": "debugging",
+    "related_components": [
+      "TypeScript",
+      "MCP handlers",
+      "tools.ts",
+      "handlers.ts",
+      "service层",
+      "task/batch schema"
+    ],
+    "prevention": "进行模块拆分重构时，应在每个小步骤后运行 TypeScript 编译检查，而不是等到所有文件都修改完再检查。可以在 CI 中强制 tsc --noEmit 作为门禁，确保类型安全在重构过程中持续得到验证。",
+    "confidence": 0.78,
+    "_hash": "58e31b51e0aa69a5",
+    "_distilled_at": "2026-04-05T06:41:12.148685Z"
+  },
+  {
+    "issue_context": "需要为现有 Hono 服务接入 MCP 能力，面临 SSE 流式模式与 JSON 同步模式的选择，以及 Nginx 反向代理改动成本的权衡",
+    "root_cause": "MCP SDK 支持两种传输模式：SSE 长连接模式需要 Nginx 关闭 proxy_buffering、延长 proxy_read_timeout，且需要新增 location 配置；而 JSON 模式是普通 HTTP 请求响应，可复用现有 /api 代理规则，无需任何 Nginx 改动",
+    "solution": "将 MCP 端点挂载在 /api/mcp 而非 /mcp，启用 enableJsonResponse: true，复用现有 /api 的 Nginx 反向代理规则。对于查询返回型工具（get_shadow、search_memory 等），JSON 模式完全满足需求",
+    "rationale": "第一性原理：能不改基础设施就不改。当前所有 MCP 工具均为一次调用一次返回的查询型，无流式输出或服务端主动推送需求，SSE 的额外复杂度没有对应收益。/api/mcp 路径可直接命中现有 Nginx location /api 规则，零运维改动。未来若引入 LLM 流式分析再升级为 SSE 也不困难",
+    "experience_type": "architecture",
+    "related_components": [
+      "Nginx",
+      "Hono",
+      "MCP SDK",
+      "WebStandardStreamableHTTPServerTransport"
+    ],
+    "prevention": "在引入新协议或传输模式前，先评估现有基础设施的兼容性。SSE 在 Nginx 代理下需要特殊配置（proxy_buffering off + 长超时），应作为架构决策的显式成本列出",
+    "confidence": 0.92,
+    "_hash": "5750d3da4f3542b2",
+    "_distilled_at": "2026-04-05T06:41:55.665848Z"
+  },
+  {
+    "issue_context": "现有 MCP 实现被描述为'远程模式'，但实际上 stdio 无法直接用于远端通信，导致架构理解混乱",
+    "root_cause": "stdio 传输只能用于本地进程间通信（IPC），所谓'远程模式'实际上是：Cursor 通过 stdio 与本地 Node 进程通信，本地 Node 进程再通过 fetch/HTTP 调用远端 API。本地进程充当的是一个透明代理层，并非真正的远程 MCP",
+    "solution": "明确区分两种架构：(1) stdio + 本地数据库直连（真正的本地模式）；(2) stdio + 本地进程 HTTP 转发远端 API（伪远程模式，本质是本地代理）。若要真正去掉本地代理层，需要实现 HTTP MCP 端点，让 Cursor 直接通过 HTTP 连接远端服务",
+    "rationale": "stdio 是 POSIX 标准输入输出，物理上只能在同一机器的进程间传递数据。任何'通过 stdio 连接远端'的说法都意味着中间存在一个本地转发进程。识别这个隐藏的代理层对于理解部署负担（每个客户端需要本地 Node 环境）和安全边界至关重要",
+    "experience_type": "architecture",
+    "related_components": [
+      "MCP SDK",
+      "stdio transport",
+      "HTTP MCP",
+      "Cursor MCP"
+    ],
+    "prevention": "在描述 MCP 架构时，明确区分'传输层'（stdio/HTTP）和'数据源'（本地DB/远端API）。stdio 永远只是本地 IPC，数据源可以是远端的，但这不等于 stdio 是远程传输",
+    "confidence": 0.95,
+    "_hash": "0302ee8ce76abbfb",
+    "_distilled_at": "2026-04-05T06:41:55.665870Z"
+  },
+  {
+    "issue_context": "在 PowerShell 环境中执行 curl -s --connect-timeout 5 http://... 进行健康检查，命令失败，参数无法绑定",
+    "root_cause": "PowerShell 中 curl 是 Invoke-WebRequest 的别名，不是 Unix curl 二进制。Unix 风格的 -s（silent）和 --connect-timeout 参数对 Invoke-WebRequest 无效，导致参数绑定错误",
+    "solution": "在 PowerShell 中使用 curl.exe 显式调用 Windows 系统中安装的 curl 二进制，或改用 Invoke-WebRequest 的 PowerShell 原生参数语法。远程健康检查改为通过 SSH 在远端执行 curl 命令",
+    "rationale": "PowerShell 的 curl 别名是历史遗留问题，在跨平台脚本中极易踩坑。明确使用 curl.exe 可以绕过别名解析，保证行为与 Unix 一致",
+    "experience_type": "cross_platform",
+    "related_components": [
+      "PowerShell",
+      "curl",
+      "健康检查"
+    ],
+    "prevention": "在 PowerShell 脚本或 CI 环境中，统一使用 curl.exe 而非 curl，或在脚本顶部添加 Remove-Item Alias:curl 移除别名。跨平台工具脚本应在注释中标注 shell 环境要求",
+    "confidence": 0.97,
+    "_hash": "32f1e04be8a68e33",
+    "_distilled_at": "2026-04-05T06:41:55.665881Z"
+  },
+  {
+    "issue_context": "将 MCP Server 从 stdio 迁移到 HTTP 模式时，需要重新设计身份认证机制，原有方案依赖本地配置文件中的 person_id",
+    "root_cause": "stdio 模式下 MCP Server 作为本地进程运行，可以信任本地 ~/.shadow/config.json 中的 person_id，因为只有本机用户能启动该进程。HTTP 模式下请求来自网络，请求参数中的 person_id 不可信，必须从经过验证的认证信息中提取身份",
+    "solution": "HTTP MCP 端点通过中间件验证 Bearer Token，将解析出的身份信息（authInfo）注入请求上下文，MCP handler 从 authInfo 而非请求参数中获取 person_id。复用现有 Hono 的 sf_ Bearer Token 认证体系",
+    "rationale": "安全边界随传输模式改变而改变。stdio 的安全边界是操作系统进程隔离；HTTP 的安全边界是网络认证。迁移传输层时必须同步迁移信任模型，否则会引入身份伪造漏洞",
+    "experience_type": "architecture",
+    "related_components": [
+      "MCP SDK",
+      "Hono",
+      "Bearer Token",
+      "WebStandardStreamableHTTPServerTransport",
+      "身份认证"
+    ],
+    "prevention": "在设计任何从本地进程迁移到网络服务的方案时，将'信任模型变更'作为必检项。本地进程可以信任环境变量和本地文件；网络服务必须通过加密认证建立信任，不能信任请求载荷中的身份声明",
+    "confidence": 0.93,
+    "_hash": "fa53d18785c898d0",
+    "_distilled_at": "2026-04-05T06:41:55.665893Z"
+  },
+  {
+    "issue_context": "MCP SDK 中存在多个 server transport 实现，需要确认 WebStandardStreamableHTTPServerTransport 是否已包含在当前安装版本中",
+    "root_cause": "MCP SDK 各版本功能差异较大，WebStandardStreamableHTTPServerTransport 是相对较新的 Web 标准兼容实现，需要确认版本支持",
+    "solution": "通过 npm view @modelcontextprotocol/sdk version 确认版本为 1.28.0，并通过检查 node_modules/@modelcontextprotocol/sdk/dist/esm/server 目录确认 webStandardStreamableHttp 模块文件存在。该版本已原生支持，无需额外依赖",
+    "rationale": "在实现前验证 SDK 能力可以避免写完代码才发现需要升级依赖或 API 不存在的情况。直接检查 dist 目录比查文档更可靠，因为文档可能滞后",
+    "experience_type": "tooling",
+    "related_components": [
+      "@modelcontextprotocol/sdk",
+      "WebStandardStreamableHTTPServerTransport",
+      "Hono"
+    ],
+    "prevention": "引入新 SDK 功能前，先检查 node_modules 中的实际构建产物目录结构，比依赖文档更能准确反映当前安装版本的实际能力",
+    "confidence": 0.88,
+    "_hash": "a7ba883b24767140",
+    "_distilled_at": "2026-04-05T06:41:55.665903Z"
+  },
+  {
+    "issue_context": "在远程 SSH 执行 sqlite3 查询时，WHERE 子句中的字符串值（UUID 或普通字符串如 'yuantongliu'）未被正确引号包裹，导致 SQLite 将其解析为列名而非字符串字面量，查询报错 'Error: in...'（malformed token）。连续出现三次：查询 projects 表的 UUID、查询 shadows 表的 person_id、查询 org_members 表的 person_id。",
+    "root_cause": "在 shell 命令中内嵌 SQL 字符串时，单引号在 shell 层被消耗或转义失败，导致最终传给 sqlite3 的 SQL 中字符串值缺少引号，SQLite 将裸词解析为标识符（列名）而非字符串常量。",
+    "solution": "将 SQL 写入临时文件（如 /tmp/tmp-query.sql），通过 SCP 上传到远程主机，再用 sqlite3 db_path < /tmp/tmp-query.sql 执行，完全绕开 shell 引号转义问题。这也是后续成功查询所采用的方式。",
+    "rationale": "通过文件传递 SQL 而非内联在 shell 命令中，可以完全避免 shell 对单引号、双引号的干扰，SQL 内容原样传递给 sqlite3，是处理复杂 SQL 或含特殊字符值时最可靠的远程执行方式。",
+    "experience_type": "debugging",
+    "related_components": [
+      "SQLite",
+      "SSH",
+      "shell scripting",
+      "SCP"
+    ],
+    "prevention": "凡需要在 SSH 命令中内联执行含字符串字面量的 SQL，优先使用 heredoc 或文件传递方式；若必须内联，使用 $'...' 语法或对单引号做 '\"'\"' 转义，并在本地先验证转义后的命令字符串。",
+    "confidence": 0.95,
+    "_hash": "d6a2f686e0ece4ea",
+    "_distilled_at": "2026-04-05T06:42:19.732334Z"
+  },
+  {
+    "issue_context": "MCP 工具 search_memory_like 在 JSON Schema 中声明了 person_id 参数，但服务端实现完全忽略该参数，始终只搜索调用者自己的记忆。导致 yuantongliu 传入 person_id: 'minusjiang' 时请求无效，无法查询他人记忆。",
+    "root_cause": "Schema 声明与实现不同步：开发者在 schema 层添加了 person_id 字段，但忘记在实际处理逻辑中读取 args.person_id 并将其传入查询，导致参数被静默丢弃。同时跨用户查询缺少权限校验层。",
+    "solution": "在 mcp/server.ts 中修复 search_memory_like 处理逻辑，读取 args.person_id，搜索他人记忆前调用 checkMemoryAccessAcrossProjects 做权限验证；同步修复 api/push.ts 的 /push/query/memories/search_like 端点和 shadow.service.ts 中的对应服务层实现。",
+    "rationale": "跨用户数据访问必须同时满足两个条件：参数正确传递 + 权限显式校验。仅修复参数传递而不加权限校验会造成越权访问；仅加权限校验而不传参则功能仍然失效。三处（MCP server、HTTP API、service 层）需保持一致。",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP server",
+      "push API",
+      "shadow.service",
+      "TypeScript",
+      "权限校验"
+    ],
+    "prevention": "新增带参数的 MCP 工具时，应有集成测试覆盖每个声明参数的实际生效路径，避免 schema 与实现脱节。跨用户/跨资源操作必须在服务层强制加权限校验，不能依赖调用方自律。",
+    "confidence": 0.92,
+    "_hash": "d9858ae700abd72a",
+    "_distilled_at": "2026-04-05T06:42:19.732373Z"
+  },
+  {
+    "issue_context": "在 Windows PowerShell 环境中，尝试用 && 串联 scp 和 ssh 命令时，PowerShell 报 InvalidEndOfLine 解析错误，命令无法执行。",
+    "root_cause": "PowerShell 不支持 Bash 风格的 && 命令串联操作符（在 PowerShell 5.x 及更早版本中），导致本地生成的临时 .ps1 脚本在解析阶段就失败，从未真正发起网络连接。",
+    "solution": "将 scp 和 ssh 拆分为两条独立命令分步执行，或改用 PowerShell 原生的 ; 分隔符，或将整个操作封装为独立的 .sh 脚本文件后通过 bash 调用。",
+    "rationale": "&& 是 POSIX shell 的短路与操作符，PowerShell 有自己的语法体系。在跨平台自动化脚本中，不能假设本地 shell 与目标 shell 语法兼容，应明确区分本地执行环境。",
+    "experience_type": "cross_platform",
+    "related_components": [
+      "PowerShell",
+      "SSH",
+      "SCP",
+      "shell scripting"
+    ],
+    "prevention": "在 Windows 开发机上编写远程执行脚本时，统一使用 WSL 或 Git Bash 作为执行环境，或将所有远程操作封装为独立 .sh 文件通过 bash.exe 调用，避免在 PowerShell 中内联 POSIX 语法。",
+    "confidence": 0.92,
+    "_hash": "3b3aacb9a03470b0",
+    "_distilled_at": "2026-04-05T06:43:18.383648Z"
+  },
+  {
+    "issue_context": "多次尝试通过 SSH 在远程主机执行内联 sqlite3 查询，命令形如 ssh host \"sqlite3 /path/db.db 'SELECT ...'\"，远程 bash 持续报未闭合引号（EOF quoting error），SQL 从未实际执行。",
+    "root_cause": "多层 shell 嵌套的引号转义问题：PowerShell → SSH 参数 → 远程 bash → sqlite3 SQL 字符串，每一层都会对引号进行一次解析/剥离，导致到达远程 bash 时引号已不匹配。尤其是 SQL 中的单引号与外层 shell 引号产生冲突。",
+    "solution": "将查询脚本写入本地文件（如 tmp-query.sh），通过 scp 传输到远程 /tmp 目录，再用 ssh host 'bash /tmp/tmp-query.sh' 执行。这样完全绕开多层引号嵌套问题。",
+    "rationale": "文件传输 + 远程执行的两步法将「脚本内容」与「执行命令」解耦，脚本内容在传输时不经过任何 shell 解析，远程执行命令本身也足够简单，不存在引号嵌套。这是处理复杂远程命令的最可靠模式。",
+    "experience_type": "debugging",
+    "related_components": [
+      "SSH",
+      "sqlite3",
+      "PowerShell",
+      "bash",
+      "shell quoting"
+    ],
+    "prevention": "凡是需要在远程执行包含变量、引号或多行逻辑的命令，一律采用「本地写文件 → scp 传输 → ssh 执行文件」三步法，禁止在 ssh 命令行内联复杂脚本字符串。",
+    "confidence": 0.95,
+    "_hash": "11309eb13090f24f",
+    "_distilled_at": "2026-04-05T06:43:18.383662Z"
+  },
+  {
+    "issue_context": "远程脚本执行时报错：脚本文件含 CRLF 行尾，导致 bash 解析失败（如 $'\\r': command not found）；同时目标数据库中不存在预期的 projects、shadows、org_members 等表。",
+    "root_cause": "两个独立问题：1) 脚本在 Windows 上创建，行尾为 CRLF，传输到 Linux 后 bash 将 \\r 视为命令名的一部分导致解析错误；2) 查询指向了错误的数据库文件（shadow.db 为 0 字节空文件，实际数据在 sqlite.db）。",
+    "solution": "1) 在 scp 传输前用 dos2unix 或 sed -i 's/\\r//' 转换行尾；或在编辑器中强制设置 LF 行尾保存。2) 传输前先用 ls -la 确认目标数据库文件大小非零，选择正确的数据库路径。",
+    "rationale": "CRLF 问题是 Windows 开发者在 Linux 远程调试时的高频陷阱，且错误信息不直观。数据库文件选错则属于环境探查不足，应在执行查询前先确认文件状态。",
+    "experience_type": "cross_platform",
+    "related_components": [
+      "bash",
+      "SQLite",
+      "SCP",
+      "Windows/Linux 跨平台"
+    ],
+    "prevention": "建立远程脚本执行 checklist：① 确认脚本行尾为 LF；② 确认目标数据库文件 size > 0；③ 确认目标库 schema 包含预期表（可用 sqlite3 db.db .tables 快速验证）。",
+    "confidence": 0.93,
+    "_hash": "69ed98a24175e501",
+    "_distilled_at": "2026-04-05T06:43:18.383669Z"
+  },
+  {
+    "issue_context": "MCP 工具 search_memory_like 暴露了 person_id 参数，调用者传入目标用户 ID（如 minusjiang）期望搜索该用户的记忆，但实际始终返回调用者自己的记忆，跨用户搜索完全失效。",
+    "root_cause": "实现层面存在两个缺陷：1) MCP server.ts 中 search_memory_like 的 schema 声明了 person_id 参数，但实现代码始终使用调用者自身的 personId，完全忽略 args.person_id；2) 底层 push API 端点本身也不支持跨用户搜索语义。",
+    "solution": "短期：改用 search_project_memories（支持项目内权限校验的跨用户搜索）替代 search_memory_like。长期：修复 search_memory_like 实现，在权限校验通过的前提下使用 args.person_id 替代调用者 personId，并修复底层 API 端点支持跨用户查询。",
+    "rationale": "API schema 与实现不一致是一类隐蔽 bug，调用者无法从文档或参数名发现问题，只能通过实际测试或代码审查才能定位。此类问题应在 code review 阶段通过「schema 参数是否在实现中被使用」的检查项来拦截。",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP server",
+      "search_memory_like",
+      "MemoryService",
+      "push API"
+    ],
+    "prevention": "为 MCP 工具编写集成测试，覆盖「传入非调用者 person_id 时返回目标用户数据」的场景。同时在 code review 中强制检查：schema 中声明的每个参数在实现中是否被实际使用。",
+    "confidence": 0.95,
+    "_hash": "cf4f0ef87b0bce59",
+    "_distilled_at": "2026-04-05T06:43:18.383675Z"
+  },
+  {
+    "issue_context": "项目访问权限判断逻辑分散在 MCP server.ts 和多个 API handler 中，各处实现不一致，导致通过组织成员身份继承的项目可见性在部分接口中缺失（子项目不可见）。",
+    "root_cause": "权限判断逻辑没有统一抽象，各调用点各自实现，导致覆盖不全——某些接口只检查直接项目成员关系，未考虑通过 org_members 间接获得的项目访问权。",
+    "solution": "新增统一的 ProjectAccessService（project-access.service.ts），提供 getAccessibleProjects 和 hasProjectAccess 两个核心方法，将组织成员继承逻辑收敛其中。将 MCP 和 API 中所有分散的权限判断替换为对该服务的调用。",
+    "rationale": "权限判断是横切关注点，必须单点实现。分散实现不仅导致遗漏，还使后续修改需要同步多处，维护成本高且容易引入不一致。集中到 Service 层后，逻辑变更只需修改一处，所有调用点自动受益。",
+    "experience_type": "architecture",
+    "related_components": [
+      "ProjectAccessService",
+      "MCP server",
+      "API handlers",
+      "org_members",
+      "权限控制"
+    ],
+    "prevention": "在设计阶段识别横切关注点（权限、日志、限流等），强制要求通过统一 Service/middleware 实现，禁止在业务逻辑层内联权限判断代码。新增接口时 code review 需检查是否复用了统一权限服务。",
+    "confidence": 0.9,
+    "_hash": "73bcebcb88b9a0e7",
+    "_distilled_at": "2026-04-05T06:43:18.383681Z"
+  },
+  {
+    "issue_context": "在 PowerShell 中通过 SSH 执行内联 Node.js 脚本（node -e '...'），JavaScript 代码中的引号与 PowerShell/SSH 参数解析冲突，命令在本地 PowerShell 临时脚本解析阶段就失败，从未到达远程 Node 执行环节。",
+    "root_cause": "PowerShell → SSH 参数 → 远程 bash → node -e 的四层嵌套中，JavaScript 源码中的引号（单引号、双引号、模板字符串反引号）与各层 shell 的引号语义冲突，无法通过字符串转义安全传递复杂代码。",
+    "solution": "将 JavaScript 脚本写入本地 .js 文件，通过 scp 传输到远程，再用 ssh host 'node /tmp/script.js' 执行。对于需要动态参数的场景，通过环境变量或命令行参数传入，而非内联到脚本字符串中。",
+    "rationale": "任何超过单行的代码都不应该通过命令行字符串内联传递给解释器，这是一个普适原则。文件是传递代码的正确载体，命令行参数只适合传递简单标量值。",
+    "experience_type": "workflow",
+    "related_components": [
+      "PowerShell",
+      "SSH",
+      "Node.js",
+      "Docker exec",
+      "shell quoting"
+    ],
+    "prevention": "制定团队规范：远程执行超过一行的脚本，必须使用文件传输方式。CI/CD 脚本中如需动态生成远程脚本，使用 heredoc 或 base64 编码传输，避免直接内联代码字符串。",
+    "confidence": 0.93,
+    "_hash": "9ef63ce6717b1062",
+    "_distilled_at": "2026-04-05T06:43:18.383687Z"
+  },
+  {
+    "issue_context": "在 Windows PowerShell 环境下执行 git commit 命令时失败，错误原因是命令中使用了 Bash 风格的 heredoc（<<EOF）和命令替换（$(...)）语法，PowerShell 不支持这些语法，导致提交无法完成。",
+    "root_cause": "Windows PowerShell 与 Bash/sh 的语法不兼容：heredoc 语法（<<EOF）和命令替换语法（$(...)）是 POSIX shell 特性，PowerShell 使用完全不同的语法体系，直接执行 Bash 风格的多行命令会解析失败。",
+    "solution": "在 Windows 环境下构造多行 git commit message 时，改用 PowerShell 原生方式：使用 @'...'@ here-string 语法，或将 commit message 写入临时文件后通过 git commit -F <file> 引用，或使用 git commit -m \"line1`nline2\" 的 PowerShell 换行符写法。",
+    "rationale": "跨平台 CI/脚本编写时必须识别当前 shell 环境。Windows 开发机上 AI Agent 默认调用 PowerShell 而非 bash，任何包含 heredoc 或 $() 的 shell 片段都会静默失败或报语法错误。提前适配 PowerShell 语法可避免反复重试。",
+    "experience_type": "cross_platform",
+    "related_components": [
+      "git",
+      "PowerShell",
+      "Windows开发环境",
+      "CI脚本"
+    ],
+    "prevention": "在多平台项目中，编写 shell 脚本或 AI Agent 工具调用时，应先检测 $SHELL / $PSVersionTable 等环境变量判断当前 shell 类型，或统一使用跨平台兼容写法（如 git commit -m 单行 + \\n 转义）。避免在 Agent prompt 或自动化脚本中硬编码 Bash heredoc 语法。",
+    "confidence": 0.92,
+    "_hash": "ea31ce3ecf2f2a03",
+    "_distilled_at": "2026-04-05T06:43:54.596632Z"
+  },
+  {
+    "issue_context": "项目列表接口（get_projects）、MCP 工具以及相关 API 端点在返回用户可访问项目时存在遗漏：只检查了个人直接拥有（owner）和 shadow 记录两种来源，导致通过组织成员关系（org membership）授权访问的项目被完全忽略，用户看不到自己有权访问的组织项目。",
+    "root_cause": "权限判断逻辑分散在各个端点中，每个端点各自实现了部分访问来源的检查（owner + shadow），没有统一的访问控制抽象层，导致新增访问来源（组织成员）时各端点均未同步更新，形成系统性遗漏。",
+    "solution": "引入集中式 ProjectAccessService，将 owner / shadow / org-member 三种访问来源的判断逻辑统一封装在该 Service 中，暴露 hasAccess() 等通用方法。将原来分散在 projects.ts、push.ts、shadows.ts、mcp/server.ts 各端点中的 shadow 检查替换为对 ProjectAccessService 的统一调用。",
+    "rationale": "访问控制逻辑天然具有多来源、易扩展的特点。分散实现会导致：(1) 新增访问来源时需要逐一修改所有端点，极易遗漏；(2) 各端点逻辑不一致产生权限不对称 bug；(3) 测试覆盖困难。集中到 Service 层后，单点维护、单点测试，符合单一职责原则，后续扩展（如团队权限、细粒度 ACL）只需修改一处。",
+    "experience_type": "architecture",
+    "related_components": [
+      "ProjectAccessService",
+      "projects API",
+      "push API",
+      "shadows API",
+      "MCP server",
+      "组织成员权限",
+      "TypeScript/Node.js后端"
+    ],
+    "prevention": "设计多来源权限系统时，从第一天起就应建立统一的访问控制抽象层（Service/Policy 对象），禁止在业务端点中直接编写权限判断逻辑。Code Review 阶段应检查是否存在绕过统一权限层的直接数据库查询。",
+    "confidence": 0.95,
+    "_hash": "4bf059dd7475e687",
+    "_distilled_at": "2026-04-05T06:43:54.596675Z"
+  },
+  {
+    "issue_context": "在 Windows 环境下执行 git add 时，push.ts 文件触发了 CRLF 行尾警告（LF will be replaced by CRLF），这可能在后续 diff、跨平台协作或 CI 中产生格式噪音，甚至导致误判文件被修改。",
+    "root_cause": "Windows 系统默认使用 CRLF 行尾，而 Git 在 core.autocrlf=true 配置下会自动转换行尾，导致文件在 Windows 本地存储为 CRLF，但提交到仓库时转换为 LF。如果团队或 CI 环境配置不一致，会产生持续的行尾差异噪音。",
+    "solution": "在仓库根目录添加 .gitattributes 文件，明确指定 *.ts text eol=lf（或按需配置），强制所有 TypeScript 文件使用 LF 行尾，消除平台差异。同时建议团队统一 Git 配置 core.autocrlf=input（Mac/Linux）或 core.autocrlf=true（Windows）。",
+    "rationale": ".gitattributes 是仓库级别的行尾策略，优先级高于本地 Git 配置，能确保所有贡献者和 CI 环境行为一致，从根本上消除跨平台行尾问题，避免无意义的 diff 噪音干扰 Code Review。",
+    "experience_type": "cross_platform",
+    "related_components": [
+      "git",
+      ".gitattributes",
+      "Windows开发环境",
+      "TypeScript项目"
+    ],
+    "prevention": "新建跨平台项目时，应在初始化阶段就配置 .gitattributes，将行尾策略纳入版本控制，而不是依赖每个开发者的本地 Git 配置。",
+    "confidence": 0.88,
+    "_hash": "ac34f6f52f0d06ef",
+    "_distilled_at": "2026-04-05T06:43:54.596695Z"
+  },
+  {
+    "issue_context": "用户在前端组织页面能看到 tank 项目（路径显示为 agent-core / tank），且 minusjiang 显示为 MEMBER，但 MCP 的 get_projects 接口只返回顶层项目 agent-core（id: 31336ccc），不返回子项目 tank。导致所有基于 project_id 的任务查询（get_project_tasks）和记忆搜索（search_project_memories）全部落到父项目或返回空结果，AI 经过 7 轮、20+ 次调用仍无法定位目标人员在 tank 项目中的工作内容。",
+    "root_cause": "get_projects 的查询逻辑由两部分组成：① WHERE projects.person_id = 当前用户（个人拥有项目）；② shadows INNER JOIN projects WHERE is_active = true（有 active shadow 的项目）。这两个条件都不覆盖「用户是组织成员但未被单独创建 shadow」的情况。前端组织主页使用 listOrgProjects(orgId) 直接按 org_id 枚举所有项目，因此前端可见而 MCP 不可见。根本原因是项目可见性的权限模型在前端和 MCP 层不一致：前端以 org 成员身份推导项目可见性，MCP 以 shadow 存在性推导项目可见性。",
+    "solution": "新增 ProjectAccessService，提供两个核心方法：① getAccessibleProjects(personId) 返回三个来源的项目并集并按 project_id 去重：个人拥有项目（projects.person_id = personId）、有 active shadow 的项目（shadows 表）、所在 org 下的全部项目（org_members + organizations + projects）；② hasProjectAccess(personId, projectId) 替代原有多处 getShadowByProjectAndPerson 调用，统一权限判断入口。将 mcp/server.ts 中 search_project_memories、get_project_tasks、get_project_members 等工具的权限校验改为调用 hasProjectAccess。",
+    "rationale": "组织是项目的分组容器而非独立权限域，shadow 是开发数据暴露机制，两者语义不同，不应用 shadow 存在性来代理项目可见性。将权限逻辑收敛到单一服务层，避免前端/MCP/API 各自维护不同的可见性口径，降低后续扩展时出现新的不一致风险。特殊场景（发布数据的 shadow_id 校验、owner role 校验、exposed_facets 检查）保留原有精细控制，不纳入通用访问服务。",
+    "experience_type": "debugging",
+    "related_components": [
+      "MCP server (mcp/server.ts)",
+      "project-access.service.ts",
+      "get_projects API",
+      "shadows 表",
+      "org_members 表",
+      "前端 listOrgProjects"
+    ],
+    "prevention": "在设计涉及多入口（前端/API/MCP）的权限查询时，必须在同一层（服务层）定义唯一的「可见性来源」，禁止各入口自行拼接查询条件。新增访问路径时（如组织成员）需同步更新所有消费方，或通过统一服务层自动覆盖。",
+    "confidence": 0.92,
+    "_hash": "4f11677cd39fbb80",
+    "_distilled_at": "2026-04-05T06:44:42.243121Z"
+  },
+  {
+    "issue_context": "在排查 get_projects 漏返回问题时，初步怀疑是「父子项目层级」导致子项目未被返回，但实际数据库中并不存在 parent_id 字段或父子项目关系。agent-core 和 tank 是同一 organizations 下的两个平级 projects 记录，通过相同的 org_id 归属同一组织。",
+    "root_cause": "前端 UI 的路径展示（agent-core / tank）造成了「父子项目」的视觉误导，实际数据模型是扁平的：两者都是独立的 project 记录，仅通过 org_id 关联到同一组织，没有层级关系。",
+    "solution": "排查时应先查数据库 schema 确认是否存在 parent_id 等层级字段，再结合前端渲染逻辑判断 UI 展示与数据模型的对应关系，避免被 UI 路径格式误导假设数据结构。",
+    "rationale": "UI 展示层的层级路径（breadcrumb 风格）不一定对应数据层的层级结构，可能只是按 org 分组后的视觉呈现。在排障时需区分「展示模型」和「数据模型」。",
+    "experience_type": "debugging",
+    "related_components": [
+      "projects 表",
+      "organizations 表",
+      "前端组织项目列表页"
+    ],
+    "prevention": "文档化数据模型时明确说明项目是否支持层级，避免 UI 路径格式与数据结构产生歧义。BadCase 文档中应包含数据库 schema 片段作为佐证。",
+    "confidence": 0.88,
+    "_hash": "cdaba11bccb8d7ec",
+    "_distilled_at": "2026-04-05T06:44:42.243155Z"
+  },
+  {
+    "issue_context": "AI Agent 在执行「查找某人在某项目的工作内容」任务时，进行了 7 轮、20+ 次 MCP 工具调用（search_project_memories、get_project_tasks 等），全部返回空结果或无关结果。事后分析发现失败原因不是关键词选择问题，而是目标项目（tank）的 project_id 根本不在调用者的可访问项目列表中，所有工具调用的 project_id 参数都指向了错误的父项目。",
+    "root_cause": "MCP 工具的项目发现能力（get_projects）存在可见性盲区，导致 Agent 拿到的 project_id 集合不完整。Agent 在未能发现目标项目的情况下，持续用错误的 project_id 重试，消耗大量 token 但无法突破接口边界限制。",
+    "solution": "① 短期：修复 get_projects 的可见性逻辑（见上条经验）；② 中期：为 MCP 增加按人员跨项目检索能力，允许在不指定 project_id 的情况下搜索某人的记忆；③ 提供 org 枚举接口，让 Agent 能发现组织下的全部项目。",
+    "rationale": "当 Agent 的工具集存在系统性盲区时，增加重试次数和调整关键词都无法解决问题。需要从工具能力层面补全缺失的发现路径，而不是期望 Agent 通过更多尝试绕过接口限制。这类问题应通过 BadCase 文档沉淀，推动接口能力补全。",
+    "experience_type": "architecture",
+    "related_components": [
+      "MCP server",
+      "get_projects",
+      "search_project_memories",
+      "get_project_tasks"
+    ],
+    "prevention": "在设计 Agent 工具集时，需保证「发现」和「访问」两个能力的覆盖范围一致。如果访问工具需要 project_id，则发现工具必须能返回所有用户有权访问的 project_id，不能存在「前端可见但工具不可发现」的项目。建议为 Agent 工具集建立覆盖率测试：枚举前端可见的所有资源，验证工具链能否完整发现并访问。",
+    "confidence": 0.9,
+    "_hash": "8edf26f95a5d481d",
+    "_distilled_at": "2026-04-05T06:44:42.243174Z"
+  }
+]

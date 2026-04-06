@@ -190,20 +190,165 @@ if edge_valid_at < resolved_edge_valid_at:
 
 **关键**：Graphiti 用的是**软作废**（设置 `invalid_at` + `expired_at`），不像 Mem0 那样硬删除。历史关系永远保留在图中。
 
-### 3.6 LLM 调用次数对比
+### 3.6 每步 LLM 调用详解：到底在干什么？
+
+Graphiti 处理**每一条 episode** 时，会进行**多次 LLM 调用**，每次调用有明确的职责。以下逐步拆解：
+
+#### 调用 1: 实体抽取（`extract_nodes`）— 模型: medium
+
+**目的**：从原始文本中识别出所有实体（人、工具、项目、概念等）。
+
+**Prompt 核心**：
+```
+You are an AI assistant that extracts entity nodes from text.
+Instructions:
+1. Extract all significant entities, concepts, or actors mentioned.
+2. Use ENTITY TYPES to classify each entity.
+3. Do NOT extract relationships, actions, dates, or times.
+```
+
+**具体例子**：输入 session_summary：
+> "我完成了 SVN 资产引用修复脚本的增强（v3），新增了 MaterialFunction 类型的专门处理逻辑"
+
+LLM 返回：
+```json
+{
+  "extracted_entities": [
+    {"name": "ziyadyao", "entity_type_id": 0},
+    {"name": "SVN 资产引用修复脚本", "entity_type_id": 0},
+    {"name": "MaterialFunction", "entity_type_id": 0}
+  ]
+}
+```
+
+#### 调用 2: 实体解析/去重（`resolve_extracted_nodes`）— 模型: medium（仅需要时）
+
+**目的**：判断新抽取的实体是否已存在于图中。例如，"SVN 认证" 和 "SVN" 是不是同一个实体？
+
+**流程**：先用 **embedding 相似度 + MinHash 快速匹配**（不调 LLM），如果无法确定再调 LLM。
+
+**Prompt 核心**：
+```
+You are a helpful assistant that determines whether ENTITIES extracted 
+from a conversation are duplicates of existing entities.
+```
+
+**具体例子**：新抽取了 "SVN认证"，图中已有 "SVN"。快速匹配不确定时，LLM 判定：
+```json
+{"duplicate_name": ""}  // 不是重复，"SVN认证" 是独立概念
+```
+
+#### 调用 3: 关系/事实抽取（`extract_edges`）— 模型: medium
+
+**目的**：基于已知实体列表，从文本中抽取实体间的关系和事实，并标注时间。
+
+**Prompt 核心**：
+```
+You are an expert fact extractor that extracts fact triples from text.
+- If the fact is ongoing (present tense), set valid_at to REFERENCE_TIME.
+- If a change/termination is expressed, set invalid_at to the relevant timestamp.
+```
+
+**具体例子**：基于实体 [ziyadyao, SVN 资产引用修复脚本, MaterialFunction]，LLM 返回：
+```json
+{
+  "edges": [
+    {
+      "source_entity_name": "ziyadyao",
+      "target_entity_name": "SVN 资产引用修复脚本",
+      "relation_type": "ENHANCED",
+      "fact": "ziyadyao 完成了 SVN 资产引用修复脚本的增强（v3版本）",
+      "valid_at": "2026-03-23T12:16:59Z"
+    },
+    {
+      "source_entity_name": "SVN 资产引用修复脚本",
+      "target_entity_name": "MaterialFunction",
+      "relation_type": "ADDED_HANDLING_FOR",
+      "fact": "SVN 资产引用修复脚本 v3 新增了对 MaterialFunction 类型的专门处理逻辑",
+      "valid_at": "2026-03-23T12:16:59Z"
+    }
+  ]
+}
+```
+
+#### 调用 4~N: 事实去重 + 矛盾检测（`resolve_extracted_edge`）— 模型: small × 每条边
+
+**目的**：对**每条新抽取的边**，检索图中已有的相似事实，判断是重复还是矛盾。**这是调用次数最多的步骤**——抽取了 N 条边，就要调 N 次 LLM。
+
+**Prompt 核心**：
+```
+You are a helpful assistant that de-duplicates facts and determines 
+which existing facts are contradicted by the new fact.
+Return: duplicate_facts (idx list) + contradicted_facts (idx list)
+```
+
+**具体例子**：新 fact "ziyadyao 完成了脚本增强 v3"，图中已有 "ziyadyao 开发了脚本 v2"。LLM 判定：
+```json
+{
+  "duplicate_facts": [],        // 不是重复（v2 ≠ v3）
+  "contradicted_facts": [0]     // v2 被 v3 取代 → 矛盾
+}
+```
+→ 旧边 `invalid_at` 设为新边的 `valid_at`，实现时间裁剪。
+
+#### 调用 N+1: 实体摘要生成（`extract_attributes_from_nodes`）— 模型: small
+
+**目的**：根据新增的事实边更新实体节点的 summary。
+
+**Prompt 核心**：
+```
+You are a helpful assistant that generates concise entity summaries 
+from provided context.
+```
+
+**具体例子**：实体 "SVN 资产引用修复脚本" 之前的 summary 为空，新增了两条边后，LLM 生成：
+> "ziyadyao 完成了 SVN 资产引用修复脚本的增强（v3版本）。SVN 资产引用修复脚本 v3 新增了对 MaterialFunction 类型的专门处理逻辑。"
+
+### 3.7 推荐模型与调用量分析
+
+#### Graphiti 默认推荐模型
+
+源码 `llm_client/openai_base_client.py`：
+
+| 模型角色 | 默认值 | 用途 |
+|---------|--------|------|
+| **medium**（`config.model`） | `gpt-4.1-mini` | 实体抽取、实体解析、关系抽取 |
+| **small**（`config.small_model`） | `gpt-4.1-nano` | 边去重/矛盾检测、摘要生成、属性抽取 |
+
+> 源码注释："works best with OpenAI and Gemini"。其他 provider 有各自默认值，如 Anthropic 用 `claude-sonnet-4-20250514` / `claude-haiku-4-20250414`。
+
+**设计理念**：计算密集但判定简单的步骤（边去重、摘要）用更便宜的 small 模型；需要深度理解的步骤（实体/关系抽取）用 medium 模型。
+
+#### 单条 Episode 的 LLM 调用量
+
+| 步骤 | 模型 | 调用次数 | 说明 |
+|------|------|---------|------|
+| 实体抽取 | medium | 1 次 | 固定 |
+| 实体解析 | medium | 0-1 次 | 仅相似度无法确定时调用 |
+| 关系抽取 | medium | 1 次 | 固定 |
+| 边去重+矛盾 | small | **N 次** | N = 抽取的边数（典型 3-10 条） |
+| 实体摘要 | small | 1 次 | 批量处理所有新/更新实体 |
+| **合计** | | **6-13 次** | medium 2-3 次 + small 4-10 次 |
+
+**关键发现**：处理 783 条 session_summary 时，按平均每条 8 次 LLM 调用计算，总共约需 **6000+ 次 LLM 调用**。这就是为什么大规模数据处理需要数小时，且容易触发 API 限流（Venus 公共服务限流 50次/分钟）。
+
+### 3.8 LLM 调用次数对比（Graphiti vs Mem0）
 
 | 步骤 | Graphiti | Mem0 |
 |------|----------|------|
-| 实体抽取 | 1 次 | 1 次（图轨） |
-| 实体解析 | 0-1 次（优先 fuzzy） | 0 次 |
-| 关系抽取 | 1 次 | 1 次（图轨） |
-| 事实去重+矛盾 | 每条边 1 次 | 每条边 1 次（图轨 delete prompt） |
+| 实体抽取 | 1 次 (medium) | 1 次（图轨） |
+| 实体解析 | 0-1 次 (medium) | 0 次 |
+| 关系抽取 | 1 次 (medium) | 1 次（图轨） |
+| 事实去重+矛盾 | N 次 (small) | N 次（图轨 delete prompt） |
 | 事实提取（向量轨） | **不需要** | 1 次 |
 | 冲突决策（向量轨） | **不需要** | 1 次 |
-| 实体摘要 | 1 次 | 0 次 |
-| **合计（典型）** | **3-5 次** | **4-5 次（向量+图）** |
+| 实体摘要 | 1 次 (small) | 0 次 |
+| **合计（典型）** | **6-13 次** | **4-5 次（向量+图）** |
 
-Graphiti 的 LLM 调用量与 Mem0 相当，但因为没有独立的向量轨，所有结果都直接进图，不存在不同步问题。
+Graphiti 的 LLM 调用量略高于 Mem0，但关键区别在于：
+- Graphiti 的高频调用（边去重）使用 **small 模型**，成本和延迟更低
+- 所有结果直接进同一个图，不存在 Mem0 的向量/图不同步问题
+- 边去重步骤保证了图的质量——不会有重复边或矛盾边共存
 
 ---
 
@@ -570,6 +715,94 @@ RETURN ep.content, ep.valid_at, ep.source_description
 3. **Structured Output 强依赖**：源码注释明确说"works best with OpenAI and Gemini"，其他 LLM 可能输出格式不对
 4. **社区规模较小**：Graphiti ~9K Stars，远小于 Mem0 的 47.8K，生态和文档成熟度不及
 5. **无向量轨 fallback**：如果图数据库不可用，整个系统不可用；Mem0 至少还有纯向量模式
+6. **无记忆衰减与重要度机制（"僵尸记忆"问题）**：详见下节
+
+---
+
+## 9. 僵尸记忆问题：Graphiti 缺失的记忆管理维度
+
+### 9.1 问题描述
+
+当知识图谱持续积累大量记忆后，一个关键问题浮现：**陈旧但未被矛盾覆盖的记忆，会在语义检索中与新记忆平等竞争**。
+
+例如：
+- 三个月前："minusjiang 偏好使用 CLI 交互"
+- 昨天："minusjiang 正在调试 MCP WebSocket 连接问题"
+
+当用户查询 "minusjiang 最近在做什么" 时，这两条记忆在 Graphiti 的搜索中**权重完全一样**——纯看语义相似度，不考虑时间远近。如果旧记忆碰巧在语义上与查询更匹配，它就会排在新记忆前面。
+
+这类"僵尸记忆"不是错误（`invalid_at` 为空，事实仍然成立），但在实际应用中**召回价值远低于近期记忆**。
+
+### 9.2 Graphiti 源码验证：确实没有处理
+
+对 Graphiti v0.28.2 源码的全面审计结果：
+
+| 能力 | 源码现状 |
+|------|---------|
+| **记忆重要度评分** | 无。`EntityNode` 和 `EntityEdge` 上没有 importance/priority/strength 字段 |
+| **时间衰减权重** | 无。`search.py` 的排序仅按 BM25/cosine/RRF 分数，不读取 `created_at` 或 `valid_at` |
+| **访问频率强化** | 无。没有记录"某条记忆被召回过多少次" |
+| **自动遗忘/淘汰** | 无。`expired_at` 字段存在但搜索时**默认不过滤**（`SearchFilters()` 默认为空） |
+| **新近性偏好** | 无。`graphiti.py` 文档写了"用当前时间作为时间相关性参考点"，但**实现中并未使用** |
+
+唯一相关的 `episode_mentions` reranker 按边被多少个 episode 引用排序（`len(edge.episodes)` 降序），衡量的是"被反复提及的频率"而非重要度或新近性。
+
+**Graphiti 的设计哲学是"一切保留，时间标注"**——通过 `valid_at/invalid_at` 记录事实的时间窗口，通过矛盾检测软作废旧边，但**不主动衰减或遗忘**。这对历史回溯很好，但对实时召回场景会产生僵尸记忆问题。
+
+### 9.3 业界对比：谁解决了这个问题？
+
+#### Supermemory：智能遗忘（Intelligent Forgetting）
+
+Supermemory（LongMemEval 基准 81.6% 准确率，超过 Zep 的 71.2%）实现了受**艾宾浩斯遗忘曲线**启发的记忆管理：
+
+| 机制 | 说明 |
+|------|------|
+| **Smart Forgetting & Decay** | 记忆有强度值，随时间自然衰减；不重要的信息逐渐变弱直到被自动清除 |
+| **Access-based Reinforcement** | 每次被召回的记忆强度增强（"越用越记得，不用就忘"） |
+| **Recency & Relevance Bias** | 最近讨论的内容获得更高权重；经常引用的文档保持"置顶" |
+| **Hierarchical Memory Layers** | 工作记忆（热）→ 短期记忆（温）→ 长期记忆（冷），不同层级不同检索策略 |
+| **Context Rewriting** | 持续更新摘要，将新旧信息融合 |
+
+> "Less relevant information gradually fades while important, frequently-accessed content stays sharp. No more drowning in irrelevant context." — Supermemory Blog
+
+#### Stanford Generative Agents：三维评分公式
+
+Stanford 的 Generative Agents 论文（"25 个 AI 小镇居民"）提出了被广泛引用的记忆检索评分模型：
+
+```
+score = α × recency + β × importance + γ × relevance
+```
+
+| 维度 | 含义 | 计算方式 |
+|------|------|---------|
+| **recency**（新近性） | 多久前的记忆 | 指数衰减函数，越旧分越低 |
+| **importance**（重要度） | 这条记忆本身有多重要 | 写入时用 LLM 打分 1-10（"吃了早餐"=1，"发现重大 bug"=9） |
+| **relevance**（相关性） | 和当前查询多相关 | embedding 余弦相似度 |
+
+这解决了僵尸记忆的核心矛盾：
+- 三个月前的 "喜欢 CLI" → recency 低，但 importance 高 + 当前查询相关时仍可被召回
+- 昨天的 "调试 MCP" → recency 高，即使 importance 一般也优先召回
+- 很久以前的琐碎记忆 → recency 低 + importance 低 → 自然沉底
+
+### 9.4 三方对比
+
+| 维度 | Graphiti | Supermemory | Stanford Generative Agents |
+|------|----------|-------------|--------------------------|
+| 重要度评分 | 无 | 有（强度值） | 有（LLM 打分 1-10） |
+| 时间衰减 | 无 | 有（智能遗忘） | 有（指数衰减） |
+| 访问强化 | 无 | 有（召回增强） | 无 |
+| 自动清除 | 无（仅软作废矛盾边） | 有（低于阈值淘汰） | 无 |
+| 检索公式 | 纯语义（BM25 + cosine + BFS） | 新近性 + 相关性 + 重要度 | α·recency + β·importance + γ·relevance |
+| 历史保留 | 完整（软作废） | 部分（弱记忆被清除） | 完整 |
+
+### 9.5 对 Graphiti 的改进方向
+
+Graphiti 已有的 `SearchFilters` 机制提供了扩展空间：
+
+1. **检索时加入 recency 权重**：在 RRF 融合阶段，将 `1/(rank+k)` 乘以时间衰减因子 `e^(-λ·Δt)`，使旧记忆自然降权
+2. **写入时增加 importance 评分**：在 `extract_edges` 后用 LLM 对每条 fact 打 importance 分（1-10），存入 `EntityEdge` 的 `attributes` 字段
+3. **读取时记录访问频率**：在 `search()` 返回结果后，更新被命中边的访问计数，实现 access-based reinforcement
+4. **默认过滤已失效边**：将 `SearchFilters` 默认设置为 `expired_at IS NULL`，除非用户明确要求查看历史
 
 ---
 
