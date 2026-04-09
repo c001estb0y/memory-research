@@ -639,7 +639,503 @@ kg.add_triple("401_error", "resolved_by", "adding_Bearer_prefix",
 
 ---
 
-## 九、与其他记忆系统的设计对比
+## 九、协作项目示例：两位开发者的 DPAR 构建记忆
+
+以下使用 DPAR 项目的真实 Session Summary 数据，展示 MemPalace 如何处理**多人协作**场景——两位开发者（ziyadyao 和 hughesli）在同一个 UE4 构建项目上的工作记录，如何被分别入宫、跨翼关联、最终形成可检索的团队记忆。
+
+### 9.1 原始数据：两个人的 Session Summary DB
+
+数据来源是两个 SQLite 数据库文件，每个文件记录一位开发者的会话摘要：
+
+```
+dpar-mem/
+├── dpar-hughesli.db    ← hughesli 的 3 条 session summary
+└── dpar-ziyad.db       ← ziyadyao 的 5 条 session summary
+```
+
+每个 DB 的 `memories` 表结构（`content_type = 'session_summary'`）：
+
+```sql
+id | user_id   | content (TEXT)                    | created_at
+---+-----------+-----------------------------------+------------------------
+ 1 | hughesli  | "我完成了DPAR流水线从QuickGenAPP到..."  | 2026-03-25T07:08:57.222Z
+ 2 | hughesli  | "我在DPAR集成项目中完成了以下关键工作..."    | 2026-03-27T07:54:58.672Z
+...
+```
+
+**8 条 summary 的时间线**（3/23 ~ 4/03）：
+
+```
+时间轴  ├── 3/23 ──┤── 3/25 ──┤── 3/26 ──┤── 3/27 ──┤── 3/28 ──┤── 4/02 ──┤── 4/03 ──┤
+ziyadyao:  ■ SVN修复   │          ■ 资产迁移   │          ■ 关卡搭建   ■■ 构建重构  │
+           │ +AI配置    │          │ +Python   │          │          │ +打包排查  │
+hughesli:  │          ■ 流水线     │          ■ 11项      │          │          ■ 全流程
+           │          │ 转换      │          │ 集成修复    │          │          │ 理解
+```
+
+> **核心问题**：这 8 条记忆，MemPalace 怎么处理？
+
+---
+
+### 9.2 数据准备：从 DB 导出到文件目录
+
+MemPalace 不直接读 SQLite。需要先将 session summary 导出为文本文件，按人组织目录：
+
+```python
+import sqlite3
+from pathlib import Path
+
+for db_name, user in [("dpar-ziyad.db", "ziyad"), ("dpar-hughesli.db", "hughesli")]:
+    conn = sqlite3.connect(f"dpar-mem/{db_name}")
+    rows = conn.execute(
+        "SELECT content, created_at FROM memories WHERE content_type='session_summary' ORDER BY created_at"
+    ).fetchall()
+    out_dir = Path(f"dpar-convos/{user}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for i, (content, ts) in enumerate(rows):
+        date = ts[:10]
+        (out_dir / f"session_{date}_{i}.txt").write_text(content, encoding="utf-8")
+    conn.close()
+```
+
+导出后的目录结构：
+
+```
+dpar-convos/
+├── ziyad/
+│   ├── session_2026-03-23_0.txt    (SVN修复+AI配置)
+│   ├── session_2026-03-26_1.txt    (资产迁移+Python脚本)
+│   ├── session_2026-03-28_2.txt    (关卡场景搭建)
+│   ├── session_2026-04-02_3.txt    (构建流程重构)
+│   └── session_2026-04-02_4.txt    (打包排查+工具调研)
+└── hughesli/
+    ├── session_2026-03-25_0.txt    (流水线转换)
+    ├── session_2026-03-27_1.txt    (11项集成修复)
+    └── session_2026-04-03_2.txt    (全流程理解)
+```
+
+---
+
+### 9.3 路径一：convo_miner 默认处理与中文关键词限制
+
+最直观的做法是对每个人的目录执行 `mine_convos`：
+
+```bash
+mempalace mine-convos dpar-convos/ziyad     --palace ~/.mempalace/palace
+mempalace mine-convos dpar-convos/hughesli  --palace ~/.mempalace/palace
+```
+
+**Step 1 — Wing 分配**：
+
+```python
+# convo_miner.py L273-274
+wing = convo_path.name.lower().replace(" ", "_").replace("-", "_")
+# "ziyad" → wing = "ziyad"
+# "hughesli" → wing = "hughesli"
+```
+
+**Step 2 — 分块**：
+
+Session summary 是单段纯文本（无 `>` 标记），`chunk_exchanges()` 走 `_chunk_by_paragraph` fallback。每条 summary 长度约 150~500 字符，均 > `MIN_CHUNK_SIZE(30)` 且无 `\n\n` 分隔，所以每条 summary = 一个 Chunk：
+
+```python
+# convo_miner.py L104-122
+# paragraphs = [整条summary]，len(paragraphs)=1，content.count("\n") < 20
+# → 不走 25 行分组，直接作为单个段落 chunk
+# 8 条 summary → 8 个 Drawer
+```
+
+**Step 3 — Room 检测（关键问题）**：
+
+`detect_convo_room()` 用英文关键词桶扫描文本前 3000 字符。对中文为主的 session summary，匹配情况如下：
+
+| Summary | 文本语言 | 英文关键词命中 | 得分 | Room |
+|---------|---------|-------------|------|------|
+| ziyad 3/23 | 中文+少量英文 | `"api"` (API平台), `"function"` (MaterialFunction) | technical=2 | **technical** |
+| ziyad 3/26 | 中文+少量英文 | `"python"` (Unreal Python), `"git"` (Git忽略规则) | technical=2 | **technical** |
+| ziyad 3/28 | 中文+极少英文 | 无匹配 (Lua, json 均不在关键词表中) | 全0 | **general** |
+| ziyad 4/02AM | 中文+少量英文 | `"python"` (Python化流程) | technical=1 | **technical** |
+| ziyad 4/02PM | 中文+少量英文 | `"code"` (Claude Code) | technical=1 | **technical** |
+| hughes 3/25 | 中文+UE术语 | 无匹配 (Cook, SVN, Blueprint 均不在关键词表) | 全0 | **general** |
+| hughes 3/27 | 中文+UE术语 | 无匹配 (PsExec, INI, YAML 均不在关键词表) | 全0 | **general** |
+| hughes 4/03 | 中文+UE术语 | 无匹配 (Cook, Pak, Puffer 均不在关键词表) | 全0 | **general** |
+
+**结果**：ziyadyao 的 4 条进了 `technical`，1 条进了 `general`；hughesli 的 3 条全部落入 `general`。
+
+**问题分析**：`TOPIC_KEYWORDS` 完全是英文关键词（`"code"`, `"python"`, `"fix"`, `"deploy"` 等），对中文为主的文本几乎无法触发有效匹配。hughesli 的文本虽然技术含量极高（流水线修复、Cook 机制、蓝图编译），但关键术语如"修复"、"问题"、"构建"均为中文，不匹配 `"fix"`、`"problem"`、`"deploy"` 等英文关键词。
+
+> **核心发现**：MemPalace 的 Room 路由对**非英文内容**有先天盲区——这是纯正则/关键词方案的固有局限。
+
+---
+
+### 9.4 路径二：project miner + 自定义 Room（推荐方案）
+
+解决中文关键词问题的正确方式是用 `miner.py` 的**项目挖掘**模式——通过 `mempalace.yaml` 自定义中文 Room 和关键词：
+
+```yaml
+# dpar-convos/mempalace.yaml
+wing: dpar
+rooms:
+  - name: build_pipeline
+    description: "构建流水线、Cook流程、打包出包"
+    keywords: [构建, 流水线, Cook, pak, 打包, 出包, 编译, pipeline, Build]
+  - name: asset_management
+    description: "资产迁移、SVN管理、引用修复"
+    keywords: [资产, 迁移, SVN, 引用, uasset, 修复脚本, PublicAssets]
+  - name: debugging
+    description: "问题排查、Bug修复、崩溃分析"
+    keywords: [排查, 问题, 修复, 崩溃, 异常, 失败, 报错, 修复]
+  - name: level_design
+    description: "关卡设计、场景搭建、地图配置"
+    keywords: [关卡, 场景, 地图, 搭建, 布局, 坦克, 竞技场]
+  - name: toolchain
+    description: "开发工具、CI/CD、脚本自动化"
+    keywords: [脚本, Python, 自动化, YAML, wrapper, 流程重构]
+```
+
+但此时两个人的数据在同一个 Wing `dpar` 下，无法利用跨翼隧道。更好的方式是**每人一个目录 + 各自的 yaml**：
+
+```
+dpar-convos/
+├── ziyad/
+│   ├── mempalace.yaml        ← wing: dpar_ziyad, rooms: [同上]
+│   └── *.txt
+└── hughesli/
+    ├── mempalace.yaml        ← wing: dpar_hughesli, rooms: [同上]
+    └── *.txt
+```
+
+执行：
+
+```bash
+mempalace mine dpar-convos/ziyad     --palace ~/.mempalace/palace
+mempalace mine dpar-convos/hughesli  --palace ~/.mempalace/palace
+```
+
+**Room 检测过程**（`miner.py` 的 `detect_room()`，走内容关键词评分）：
+
+以 hughesli 3/25 为例，对前 2000 字符扫描自定义关键词命中：
+
+```python
+# miner.py detect_room() — Priority 3: keyword scoring
+content_lower = "我完成了dpar流水线从quickgenapp到cookpak模式的转换，解决了多个关键构建问题..."
+
+scores = {
+    "build_pipeline": 0,  # 待计算
+    "asset_management": 0,
+    "debugging": 0,
+    ...
+}
+
+# build_pipeline keywords: [构建, 流水线, Cook, pak, 打包, 出包, 编译, pipeline, Build]
+# "构建" → count("构建")=1, "流水线" → count=1, "cook" → count=3(Cook×3),
+# "pak" → count=1(cookpak), "编译" → count=1
+# → build_pipeline = 7
+
+# asset_management keywords: [资产, 迁移, SVN, 引用, ...]
+# "svn" → count=1, "资产" → count=0(不在此文中)... 
+# → asset_management = 1
+
+# debugging keywords: [排查, 问题, 修复, ...]
+# "问题" → count=2, "修复" → count=3
+# → debugging = 5
+
+# 最高分 build_pipeline=7 → room = "build_pipeline"
+```
+
+所有 8 条 summary 的 Room 分配结果：
+
+| Summary | build_pipeline | asset_mgmt | debugging | level_design | toolchain | **→ Room** |
+|---------|:-:|:-:|:-:|:-:|:-:|---|
+| ziyad 3/23 (SVN修复+AI配置) | 0 | 3 (SVN,引用,修复脚本) | 2 (排查,问题) | 0 | 1 (脚本) | **asset_management** |
+| ziyad 3/26 (资产迁移) | 0 | 4 (资产,迁移,SVN×2) | 0 | 0 | 1 (脚本) | **asset_management** |
+| ziyad 3/28 (关卡搭建) | 0 | 0 | 2 (排查,问题) | 5 (关卡,场景,地图,搭建,竞技场) | 0 | **level_design** |
+| ziyad 4/02AM (构建重构) | 3 (构建,流水线,打包) | 0 | 1 (排查) | 0 | 3 (脚本,Python,流程重构) | **build_pipeline** ★ |
+| ziyad 4/02PM (打包排查) | 2 (打包,pak) | 1 (资产) | 2 (排查,问题) | 0 | 0 | **build_pipeline** ★ |
+| hughes 3/25 (流水线转换) | 7 (构建,流水线,Cook×3,pak,编译) | 1 (SVN) | 5 (问题,修复×3,报错) | 0 | 0 | **build_pipeline** ★ |
+| hughes 3/27 (11项修复) | 4 (构建,Cook,pak,编译) | 2 (资产,SVN) | 8 (问题×3,修复×4,崩溃) | 0 | 1 (脚本) | **debugging** |
+| hughes 4/03 (全流程理解) | 6 (构建,Cook×4,pak) | 2 (资产,PublicAssets) | 2 (问题,失败) | 0 | 0 | **build_pipeline** ★ |
+
+> ★ 标记表示在 `build_pipeline` 这个 Room 中，**两个 Wing 都有 Drawer**——这正是隧道形成的条件。
+
+---
+
+### 9.5 分块与入库：ChromaDB Drawer 写入
+
+`miner.py` 的 `chunk_text()` 使用 800 字符滑动窗口。大部分 session summary 长度 < 800 字符，直接作为单个 Drawer。hughesli 3/27 的内容约 650 字符，也是单块。
+
+8 个 Drawer 写入 ChromaDB `mempalace_drawers` 集合：
+
+```python
+# 以 hughesli 3/25 为例
+collection.add(
+    documents=["我完成了DPAR流水线从QuickGenAPP到cookpak模式的转换，解决了多个关键构建问题..."],
+    ids=["drawer_dpar_hughesli_build_pipeline_7a2e3f4b8c1d9056"],
+    metadatas=[{
+        "wing": "dpar_hughesli",
+        "room": "build_pipeline",
+        "source_file": "dpar-convos/hughesli/session_2026-03-25_0.txt",
+        "chunk_index": 0,
+        "added_by": "mempalace",
+        "filed_at": "2026-04-08T10:00:00",
+    }]
+)
+
+# 以 ziyad 4/02AM 为例
+collection.add(
+    documents=["我对比了流水线YAML构建逻辑与本地已跑通的构建脚本..."],
+    ids=["drawer_dpar_ziyad_build_pipeline_e5f1a2b3c4d67890"],
+    metadatas=[{
+        "wing": "dpar_ziyad",
+        "room": "build_pipeline",
+        "source_file": "dpar-convos/ziyad/session_2026-04-02_3.txt",
+        "chunk_index": 0,
+        "added_by": "mempalace",
+        "filed_at": "2026-04-08T10:00:01",
+    }]
+)
+```
+
+完成后宫殿状态：
+
+```
+  MemPalace Status — 8 drawers
+
+  WING: dpar_hughesli
+    ROOM: build_pipeline          2 drawers   (3/25 流水线转换, 4/03 全流程理解)
+    ROOM: debugging               1 drawers   (3/27 11项集成修复)
+
+  WING: dpar_ziyad
+    ROOM: asset_management        2 drawers   (3/23 SVN修复, 3/26 资产迁移)
+    ROOM: build_pipeline          2 drawers   (4/02AM 构建重构, 4/02PM 打包排查)
+    ROOM: level_design            1 drawers   (3/28 关卡搭建)
+```
+
+---
+
+### 9.6 跨翼隧道：两位开发者的知识桥接
+
+`palace_graph.py` 的 `build_graph()` 扫描所有 Drawer 的元数据，发现：
+
+```python
+room_data = {
+    "build_pipeline": {
+        "wings": {"dpar_hughesli", "dpar_ziyad"},  # ← 两个 wing！
+        "count": 4,
+    },
+    "asset_management": {
+        "wings": {"dpar_ziyad"},  # 只有一个 wing
+        "count": 2,
+    },
+    "debugging": {
+        "wings": {"dpar_hughesli"},
+        "count": 1,
+    },
+    "level_design": {
+        "wings": {"dpar_ziyad"},
+        "count": 1,
+    },
+}
+```
+
+`build_pipeline` 同时出现在 `dpar_hughesli` 和 `dpar_ziyad` 两个 Wing 中 → **形成隧道**：
+
+```python
+# palace_graph.py L68-84
+edges = [
+    {
+        "room": "build_pipeline",
+        "wing_a": "dpar_hughesli",
+        "wing_b": "dpar_ziyad",
+        "hall": "",
+        "count": 4,
+    }
+]
+```
+
+宫殿图的可视化结构：
+
+```
+┌───── Wing: dpar_ziyad ──────┐     ┌──── Wing: dpar_hughesli ───┐
+│                              │     │                             │
+│  Room: asset_management (2)  │     │                             │
+│  ┌────────────────────────┐  │     │                             │
+│  │ 3/23 SVN修复+AI配置     │  │     │                             │
+│  │ 3/26 资产迁移+Python    │  │     │                             │
+│  └────────────────────────┘  │     │                             │
+│                              │     │                             │
+│  Room: build_pipeline (2)  ══╪═════╪══ Room: build_pipeline (2)  │
+│  ┌────────────────────────┐  │ 隧道 │  ┌─────────────────────────┐│
+│  │ 4/02 构建流程重构        │  │     │  │ 3/25 流水线转换           ││
+│  │ 4/02 打包排查           │  │     │  │ 4/03 全流程理解           ││
+│  └────────────────────────┘  │     │  └─────────────────────────┘│
+│                              │     │                             │
+│  Room: level_design (1)      │     │  Room: debugging (1)        │
+│  ┌────────────────────────┐  │     │  ┌─────────────────────────┐│
+│  │ 3/28 关卡场景搭建       │  │     │  │ 3/27 11项集成修复        ││
+│  └────────────────────────┘  │     │  └─────────────────────────┘│
+└──────────────────────────────┘     └─────────────────────────────┘
+```
+
+> **隧道的含义**：`build_pipeline` 是两位开发者的**共同知识域**——hughesli 理解了 Cook/Pak 的完整机制，ziyadyao 重构了 Python 化构建流程。当有人问「DPAR 构建流程怎么走」时，隧道确保**两个人的经验都能被检索到**。
+
+通过 BFS 遍历（`traverse("build_pipeline")`），从 `build_pipeline` 出发可发现：
+
+```python
+traverse("build_pipeline", max_hops=2)
+# [
+#   {"room": "build_pipeline", "wings": ["dpar_hughesli","dpar_ziyad"], "hop": 0},
+#   {"room": "asset_management", "wings": ["dpar_ziyad"], "hop": 1, "connected_via": ["dpar_ziyad"]},
+#   {"room": "level_design", "wings": ["dpar_ziyad"], "hop": 1, "connected_via": ["dpar_ziyad"]},
+#   {"room": "debugging", "wings": ["dpar_hughesli"], "hop": 1, "connected_via": ["dpar_hughesli"]},
+# ]
+```
+
+从 `build_pipeline` 一跳就能到达所有其他 Room——因为 4 个 Room 分别只属于两个 Wing 之一，而 `build_pipeline` 横跨两个 Wing，充当了整个图的枢纽。
+
+---
+
+### 9.7 四层检索：在协作记忆中搜索
+
+**L1 Wake-up**（启动加载）：
+
+```python
+stack = MemoryStack(palace_path="~/.mempalace/palace")
+print(stack.wake_up())
+```
+
+输出（取 Top 15 Drawer，按 room 分组，每条截断 200 字符）：
+
+```
+## L1 — ESSENTIAL STORY
+
+[asset_management]
+  - 我完成了 SVN 资产引用修复脚本的增强（v3），新增了 MaterialFunction 类型的专门处理逻辑；
+    分析了 dry run 报告中 607 个 uasset 的断裂引用分布；配置了 Continue AI 代码助手并对接第三方
+    代理 API...  (session_2026-03-23_0.txt)
+  - 我在资产迁移领域进行了大量工作：使用 Unreal Python 开发依赖校验和抽查脚本，验证了公共资产的
+    完整性；完成了 607 个迁移资产及其依赖路径修复的 SVN 提交...  (session_2026-03-26_1.txt)
+
+[build_pipeline]
+  - 我完成了DPAR流水线从QuickGenAPP到cookpak模式的转换，解决了多个关键构建问题：修复了SVN认证和
+    路径不匹配问题；通过dpar_build_wrapper.py容错Blueprint编译错误...  (session_2026-03-25_0.txt)
+  - 我对比了流水线YAML构建逻辑与本地已跑通的构建脚本，发现现有流水线DPAR更像内联脚本硬编码方案...
+    (session_2026-04-02_3.txt)
+  ... (more in L3 search)
+```
+
+**L3 Deep Search**（语义搜索）：
+
+```python
+stack.search("DPAR Cook失败是什么原因", wing="dpar_hughesli")
+```
+
+```
+## L3 — SEARCH RESULTS for "DPAR Cook失败是什么原因"
+
+[1] dpar_hughesli/build_pipeline (sim=0.887)
+    我深入理解了DPAR项目的完整构建流程：主Cook处理/Game/路径资源（NeverCook排除PublicAssets），
+    DPAR Cook单独处理PublicAssets并打成dpar_*.pak通过Puffer分发。发现了PublicAssets挂载时序
+    导致的核心问题——3/30全量Cook时挂载点未注册...
+    src: session_2026-04-03_2.txt
+
+[2] dpar_hughesli/build_pipeline (sim=0.841)
+    我完成了DPAR流水线从QuickGenAPP到cookpak模式的转换，解决了多个关键构建问题：修复了SVN认证
+    和路径不匹配问题...发现并解决了Cook过程覆写PublicAssets源文件导致HotShaderDivide报
+    "Package is too old"的问题...
+    src: session_2026-03-25_0.txt
+
+[3] dpar_hughesli/debugging (sim=0.762)
+    我在DPAR集成项目中完成了以下关键工作...(7)重构资产扫描和批量Cook过程，
+    解决命令行参数超长限制...
+    src: session_2026-03-27_1.txt
+```
+
+**跨 Wing 搜索**（不指定 wing，搜索所有人的记忆）：
+
+```python
+stack.search("DPAR 打包流程优化")
+```
+
+```
+[1] dpar_ziyad/build_pipeline (sim=0.901)
+    我对比了流水线YAML构建逻辑与本地已跑通的构建脚本，发现现有流水线DPAR更像内联脚本硬编码方案，
+    确定了用本地Python化流程替换的优化方向...
+    src: session_2026-04-02_3.txt
+
+[2] dpar_hughesli/build_pipeline (sim=0.873)
+    我深入理解了DPAR项目的完整构建流程：主Cook处理/Game/路径资源...
+    src: session_2026-04-03_2.txt
+
+[3] dpar_ziyad/build_pipeline (sim=0.845)
+    我排查了DPAR打包流程中资产未被打进pak的问题...
+    src: session_2026-04-02_4.txt
+```
+
+> 不限定 Wing 时，两位开发者关于构建优化的经验会**交叉出现**，语义检索自动将最相关的内容排在前面。
+
+---
+
+### 9.8 知识图谱：时序事实链
+
+从两位开发者的记忆中，可提取出关于 DPAR 构建流程演变的时序事实：
+
+```python
+kg = KnowledgeGraph()
+
+# 构建模式演变（来自 hughesli 3/25 + ziyad 4/02）
+kg.add_triple("DPAR流水线", "uses", "QuickGenAPP",
+              valid_from="2026-03-01", source_closet="session_2026-03-25_0")
+kg.invalidate("DPAR流水线", "uses", "QuickGenAPP", ended="2026-03-25")
+kg.add_triple("DPAR流水线", "uses", "cookpak模式",
+              valid_from="2026-03-25", source_closet="session_2026-03-25_0")
+kg.add_triple("DPAR流水线", "uses", "Python化本地流程",
+              valid_from="2026-04-02", source_closet="session_2026-04-02_3")
+
+# Cook 故障链（来自 hughesli 4/03）
+kg.add_triple("PublicAssets挂载点", "status", "未注册",
+              valid_from="2026-03-30", valid_to="2026-04-03",
+              source_closet="session_2026-04-03_2")
+kg.add_triple("增量Cook缓存", "contains", "失败BP记录",
+              valid_from="2026-03-30", valid_to="2026-04-03",
+              source_closet="session_2026-04-03_2")
+kg.add_triple("DevelopmentAssetRegistry.bin", "deleted_to_fix", "Cook缓存",
+              valid_from="2026-04-03",
+              source_closet="session_2026-04-03_2")
+
+# 资产迁移里程碑（来自 ziyad 3/26）
+kg.add_triple("607个迁移资产", "status", "引用修复完成+SVN提交",
+              valid_from="2026-03-26",
+              source_closet="session_2026-03-26_1")
+```
+
+查询示例：
+
+```python
+# 2026-04-05 时，DPAR流水线用什么构建模式？
+kg.query_entity("DPAR流水线", as_of="2026-04-05")
+# → [("uses", "cookpak模式", valid_from="3/25"),
+#    ("uses", "Python化本地流程", valid_from="4/02")]
+# QuickGenAPP 已失效，不再返回
+
+# 公共资产挂载问题修复了吗？
+kg.query_entity("PublicAssets挂载点", as_of="2026-04-05")
+# → [] (valid_to="2026-04-03"，已超过有效期，说明问题已解决)
+```
+
+---
+
+### 9.9 小结：多人协作场景的关键要点
+
+1. **Wing = 人**：每位开发者一个 Wing（`dpar_ziyad`, `dpar_hughesli`），这是最自然的多人协作建模方式
+2. **自定义 Room 不可少**：对非英文内容，必须通过 `mempalace.yaml` 定义中文关键词，否则 `convo_miner` 的内置英文关键词表会导致大部分记忆落入 `general`
+3. **隧道 = 共同知识域**：`build_pipeline` 成为连接两位开发者的隧道，代表了他们的共享专业领域
+4. **语义搜索天然跨人**：不指定 Wing 时，ChromaDB 的向量检索自动将两人最相关的记忆混合排序
+5. **知识图谱追踪演变**：将两人的发现串成时序链，可回答「某个时间点，构建流程处于什么状态」
+
+---
+
+## 十、与其他记忆系统的设计对比
 
 
 | 维度         | MemPalace                      | Mem0       | Graphiti / CodeBuddy-Mem |
@@ -662,7 +1158,7 @@ MemPalace 的核心差异化在于：
 
 ---
 
-## 十、关键源码文件索引
+## 十一、关键源码文件索引
 
 
 | 文件                     | 核心职责                         | 关键行                                                       |
@@ -682,7 +1178,7 @@ MemPalace 的核心差异化在于：
 
 ---
 
-## 十一、总结
+## 十二、总结
 
 MemPalace 的设计理念是「存储不等于记忆，存储 + 协议 = 记忆」。它不追求用 LLM 做复杂的记忆抽取，而是用极简的正则/启发式方法把原文 verbatim 存储到一个有空间结构的本地向量库中，配合四层按需加载 + 图遍历 + 时序图谱，在启动时只消耗数百 token 就能让 AI 代理拥有跨会话的持久记忆。
 
