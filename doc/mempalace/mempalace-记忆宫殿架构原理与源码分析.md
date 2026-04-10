@@ -749,16 +749,18 @@ Session summary 是单段纯文本（无 `>` 标记），`chunk_exchanges()` 走
 
 `detect_convo_room()` 用英文关键词桶扫描文本前 3000 字符。对中文为主的 session summary，匹配情况如下：
 
-| Summary | 文本语言 | 英文关键词命中 | 得分 | Room |
-|---------|---------|-------------|------|------|
-| ziyad 3/23 | 中文+少量英文 | `"api"` (API平台), `"function"` (MaterialFunction) | technical=2 | **technical** |
-| ziyad 3/26 | 中文+少量英文 | `"python"` (Unreal Python), `"git"` (Git忽略规则) | technical=2 | **technical** |
-| ziyad 3/28 | 中文+极少英文 | 无匹配 (Lua, json 均不在关键词表中) | 全0 | **general** |
-| ziyad 4/02AM | 中文+少量英文 | `"python"` (Python化流程) | technical=1 | **technical** |
-| ziyad 4/02PM | 中文+少量英文 | `"code"` (Claude Code) | technical=1 | **technical** |
-| hughes 3/25 | 中文+UE术语 | 无匹配 (Cook, SVN, Blueprint 均不在关键词表) | 全0 | **general** |
-| hughes 3/27 | 中文+UE术语 | 无匹配 (PsExec, INI, YAML 均不在关键词表) | 全0 | **general** |
-| hughes 4/03 | 中文+UE术语 | 无匹配 (Cook, Pak, Puffer 均不在关键词表) | 全0 | **general** |
+
+| Summary      | 文本语言    | 英文关键词命中                                          | 得分          | Room          |
+| ------------ | ------- | ------------------------------------------------ | ----------- | ------------- |
+| ziyad 3/23   | 中文+少量英文 | `"api"` (API平台), `"function"` (MaterialFunction) | technical=2 | **technical** |
+| ziyad 3/26   | 中文+少量英文 | `"python"` (Unreal Python), `"git"` (Git忽略规则)    | technical=2 | **technical** |
+| ziyad 3/28   | 中文+极少英文 | 无匹配 (Lua, json 均不在关键词表中)                         | 全0          | **general**   |
+| ziyad 4/02AM | 中文+少量英文 | `"python"` (Python化流程)                           | technical=1 | **technical** |
+| ziyad 4/02PM | 中文+少量英文 | `"code"` (Claude Code)                           | technical=1 | **technical** |
+| hughes 3/25  | 中文+UE术语 | 无匹配 (Cook, SVN, Blueprint 均不在关键词表)               | 全0          | **general**   |
+| hughes 3/27  | 中文+UE术语 | 无匹配 (PsExec, INI, YAML 均不在关键词表)                  | 全0          | **general**   |
+| hughes 4/03  | 中文+UE术语 | 无匹配 (Cook, Pak, Puffer 均不在关键词表)                  | 全0          | **general**   |
+
 
 **结果**：ziyadyao 的 4 条进了 `technical`，1 条进了 `general`；hughesli 的 3 条全部落入 `general`。
 
@@ -845,16 +847,18 @@ scores = {
 
 所有 8 条 summary 的 Room 分配结果：
 
-| Summary | build_pipeline | asset_mgmt | debugging | level_design | toolchain | **→ Room** |
-|---------|:-:|:-:|:-:|:-:|:-:|---|
-| ziyad 3/23 (SVN修复+AI配置) | 0 | 3 (SVN,引用,修复脚本) | 2 (排查,问题) | 0 | 1 (脚本) | **asset_management** |
-| ziyad 3/26 (资产迁移) | 0 | 4 (资产,迁移,SVN×2) | 0 | 0 | 1 (脚本) | **asset_management** |
-| ziyad 3/28 (关卡搭建) | 0 | 0 | 2 (排查,问题) | 5 (关卡,场景,地图,搭建,竞技场) | 0 | **level_design** |
-| ziyad 4/02AM (构建重构) | 3 (构建,流水线,打包) | 0 | 1 (排查) | 0 | 3 (脚本,Python,流程重构) | **build_pipeline** ★ |
-| ziyad 4/02PM (打包排查) | 2 (打包,pak) | 1 (资产) | 2 (排查,问题) | 0 | 0 | **build_pipeline** ★ |
-| hughes 3/25 (流水线转换) | 7 (构建,流水线,Cook×3,pak,编译) | 1 (SVN) | 5 (问题,修复×3,报错) | 0 | 0 | **build_pipeline** ★ |
-| hughes 3/27 (11项修复) | 4 (构建,Cook,pak,编译) | 2 (资产,SVN) | 8 (问题×3,修复×4,崩溃) | 0 | 1 (脚本) | **debugging** |
-| hughes 4/03 (全流程理解) | 6 (构建,Cook×4,pak) | 2 (资产,PublicAssets) | 2 (问题,失败) | 0 | 0 | **build_pipeline** ★ |
+
+| Summary                 | build_pipeline           | asset_mgmt          | debugging        | level_design        | toolchain          | **→ Room**           |
+| ----------------------- | ------------------------ | ------------------- | ---------------- | ------------------- | ------------------ | -------------------- |
+| ziyad 3/23 (SVN修复+AI配置) | 0                        | 3 (SVN,引用,修复脚本)     | 2 (排查,问题)        | 0                   | 1 (脚本)             | **asset_management** |
+| ziyad 3/26 (资产迁移)       | 0                        | 4 (资产,迁移,SVN×2)     | 0                | 0                   | 1 (脚本)             | **asset_management** |
+| ziyad 3/28 (关卡搭建)       | 0                        | 0                   | 2 (排查,问题)        | 5 (关卡,场景,地图,搭建,竞技场) | 0                  | **level_design**     |
+| ziyad 4/02AM (构建重构)     | 3 (构建,流水线,打包)            | 0                   | 1 (排查)           | 0                   | 3 (脚本,Python,流程重构) | **build_pipeline** ★ |
+| ziyad 4/02PM (打包排查)     | 2 (打包,pak)               | 1 (资产)              | 2 (排查,问题)        | 0                   | 0                  | **build_pipeline** ★ |
+| hughes 3/25 (流水线转换)     | 7 (构建,流水线,Cook×3,pak,编译) | 1 (SVN)             | 5 (问题,修复×3,报错)   | 0                   | 0                  | **build_pipeline** ★ |
+| hughes 3/27 (11项修复)     | 4 (构建,Cook,pak,编译)       | 2 (资产,SVN)          | 8 (问题×3,修复×4,崩溃) | 0                   | 1 (脚本)             | **debugging**        |
+| hughes 4/03 (全流程理解)     | 6 (构建,Cook×4,pak)        | 2 (资产,PublicAssets) | 2 (问题,失败)        | 0                   | 0                  | **build_pipeline** ★ |
+
 
 > ★ 标记表示在 `build_pipeline` 这个 Room 中，**两个 Wing 都有 Drawer**——这正是隧道形成的条件。
 
