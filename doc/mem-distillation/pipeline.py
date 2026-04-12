@@ -25,8 +25,9 @@ def run_distillation(
     hours: int = 0,
     l1_output: str = "output/distilled_experiences.json",
     l2_output: str = "output/experience_narratives.md",
-    batch_size: int = 20,
+    batch_size: int = 50,
     min_confidence: float = 0.5,
+    include_obs_types: str = "",
 ):
     run_start = _time.monotonic()
     total_api_calls = 0
@@ -50,13 +51,32 @@ def run_distillation(
         logger.info("[Skip] 无新数据，跳过蒸馏")
         return
 
+    # ═══ Observation 过滤 ═══
+    if include_obs_types == "all":
+        filtered_obs = observations
+    elif include_obs_types:
+        allowed = {t.strip().lower() for t in include_obs_types.split(",")}
+        filtered_obs = [
+            o for o in observations
+            if o.get("type", "").lower() in allowed
+        ]
+        logger.info(
+            f"[Filter] Observation 过滤: {len(observations)} → {len(filtered_obs)} "
+            f"(保留类型: {', '.join(sorted(allowed))})"
+        )
+    else:
+        filtered_obs = []
+        logger.info(
+            f"[Filter] 跳过全部 {len(observations)} 条 Observation，仅用 Summary 蒸馏"
+        )
+
     time_range = f"最近 {hours} 小时" if hours > 0 else "全量数据"
 
     # ═══ Layer 1: 结构化蒸馏 ═══
     l1_start = _time.monotonic()
     total_added = 0
 
-    all_records = summaries + observations
+    all_records = summaries + filtered_obs
     n_batches = -(-len(all_records) // batch_size)
     logger.info(
         f"[Layer 1] 开始结构化蒸馏, 共 {len(all_records)} 条记录, "
@@ -113,7 +133,7 @@ def run_distillation(
         Path(l1_output).read_text(encoding="utf-8")
     )
 
-    theme_groups = group_experiences_by_theme(all_experiences, observations)
+    theme_groups = group_experiences_by_theme(all_experiences, filtered_obs)
     group_summary = ", ".join(
         f"{k}({len(v['experiences'])})" for k, v in theme_groups.items()
     )
@@ -208,14 +228,21 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=20,
-        help="每批记录数",
+        default=50,
+        help="每批记录数（默认 50）",
     )
     parser.add_argument(
         "--min-confidence",
         type=float,
         default=0.5,
         help="最低置信度阈值",
+    )
+    parser.add_argument(
+        "--include-obs-types",
+        type=str,
+        default="",
+        help="要包含的 observation 类型，逗号分隔（如 bugfix,configuration）。"
+             "空字符串=不传 observation，all=全量传入",
     )
     args = parser.parse_args()
 
@@ -227,6 +254,7 @@ def main():
         l2_output=args.l2_output,
         batch_size=args.batch_size,
         min_confidence=args.min_confidence,
+        include_obs_types=args.include_obs_types,
     )
 
 

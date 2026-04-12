@@ -137,8 +137,9 @@ def call_venus_api(
 
         start = _time.monotonic()
         try:
+            timeout = payload.pop("_timeout", 120)
             response = requests.post(
-                VENUS_URL, headers=headers, json=payload, timeout=120
+                VENUS_URL, headers=headers, json=payload, timeout=timeout
             )
             elapsed_ms = (_time.monotonic() - start) * 1000
 
