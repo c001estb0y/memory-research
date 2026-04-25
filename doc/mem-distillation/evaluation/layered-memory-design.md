@@ -64,10 +64,59 @@
 ├──────────────────────────────────────────────────────┤
 │                 MemPalace 存储层 (现有)                │
 │  ChromaDB collection: mempalace_drawers              │
+│                                                      │
+│  Wing = 项目 ──┬── Room = 问题域 ──┬── Drawer (L0)   │
+│  (e.g. dpar)  │  (e.g. NeverCook │    Drawer (L0)   │
+│               │   配置)           │    Drawer (L1)   │
+│               │                  │    Drawer (L2)   │
+│               ├── Room ──────────┼── Drawer ...      │
+│               │  (e.g. Android   │                   │
+│               │   打包)           │                   │
+│               └── Room ...       └── ...             │
+│                                                      │
 │  每条 Drawer 的 metadata:                            │
 │    wing / room / layer / author / date               │
 └──────────────────────────────────────────────────────┘
 ```
+
+### 2.1 三层职责速览
+
+| 层 | 职责 | 拥有什么 | 类比 |
+|----|------|---------|------|
+| **检索调度层** | 接收查询，决定搜多深，执行 L0→L1→L2 级联 | 级联策略、排序/分组逻辑 | 图书馆前台——决定先给摘要还是原著 |
+| **索引层** | 维护"结论→摘要→原始记录"的溯源映射 | `traceability_index.json` | 书目索引——告诉你某结论引自哪些原始材料 |
+| **存储层** | 组织并存放所有数据，提供向量搜索 + metadata 过滤 | Wing / Room / Drawer、ChromaDB | 书库——资料按项目和主题分区存放 |
+
+> **Wing 和 Room 归属于存储层**。Wing 是项目级隔离（如 `dpar`），Room 是该项目下的问题域聚类（如 `NeverCook配置`、`Android打包`），它们都是 Drawer metadata 上的字段。调度层本身不定义 Wing/Room，只是在查询时把它们作为过滤条件传给存储层——就像写 SQL 时 `WHERE wing='dpar' AND room='NeverCook配置'`，字段归表，不归查询语句。
+
+### 2.2 一个例子串起三层
+
+**场景**：新人小 C 遇到 Cook 流水线失败，搜索 "NeverCook 配置"。
+
+```
+① 检索调度层 收到: search_by_issue("NeverCook 配置", wing="dpar")
+   ↓ 先搜 L0（蒸馏结论）
+   ↓
+② 存储层 返回 L0 命中:
+   [ziyad, 0.92] NeverCook 优先级 > AlwaysCook → 从 CSV 移除 UGC 路径
+   [hughesli, 0.88] INI 缺 section header → 补上 header
+   ↓
+   小 C 觉得 #2 跟自己的情况像，点 "展开"
+   ↓
+③ 索引层 溯源: 经验 #2 的 hash → source_summary_ids: [142, 178, 203]
+   ↓
+④ 检索调度层 级联到 L1，从存储层拉出 3 条原始摘要:
+   2026-03-18 hughesli: "发现 INI section header 缺失是根因，修复后加载失败显著减少"
+   ↓
+   小 C 还想看操作细节，继续展开
+   ↓
+⑤ 索引层 再溯源: session_id → observation_ids
+   ↓
+⑥ 检索调度层 级联到 L2，返回操作流水:
+   [bugfix] "已在 NeverCook 条目前添加 [/Script/UnrealEd.ProjectPackagingSettings]"
+```
+
+**核心逻辑**：先给精华结论（L0），不够再展开排查摘要（L1），还不够再看操作原文（L2）—— 逐层深入，按需展开。
 
 ## 3. 数据模型
 

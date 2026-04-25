@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Cognee Knowledge Graph — DPAR Memory Import Visualization</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080c18;color:#c8d6e5;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+canvas{display:block}
+
+#overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#title{position:absolute;top:24px;left:32px;font-size:22px;font-weight:700;letter-spacing:1px;
+  background:linear-gradient(90deg,#a78bfa,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#subtitle{position:absolute;top:54px;left:32px;font-size:13px;color:#6b7c93}
+
+#pipeline{
+  position:absolute;top:90px;left:32px;
+  display:flex;gap:6px;align-items:center;font-size:11px;
+}
+.pipe-stage{
+  background:rgba(20,28,50,0.85);border:1px solid #2a3a5e;border-radius:6px;
+  padding:5px 10px;color:#8fa4bd;position:relative;
+}
+.pipe-stage.active{border-color:#a78bfa;color:#a78bfa;background:rgba(167,139,250,0.08)}
+.pipe-arrow{color:#3a4a6e;font-size:16px}
+
+#legend{
+  position:absolute;bottom:28px;right:32px;
+  background:rgba(8,12,24,0.9);border:1px solid #1e2a3a;
+  border-radius:10px;padding:16px 20px;font-size:13px;line-height:2;
+}
+.leg-row{display:flex;align-items:center;gap:10px}
+.leg-dot{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+
+#stats{
+  position:absolute;bottom:28px;left:32px;
+  background:rgba(8,12,24,0.9);border:1px solid #1e2a3a;
+  border-radius:10px;padding:16px 20px;font-size:13px;line-height:1.9;
+}
+.stat-label{color:#6b7c93}.stat-val{color:#38bdf8;font-weight:600}
+.stat-val.purple{color:#a78bfa}
+
+#controls{
+  position:absolute;top:24px;right:32px;
+  display:flex;flex-direction:column;gap:8px;pointer-events:all;
+}
+.ctrl-btn{
+  background:rgba(30,42,58,0.8);border:1px solid #2a3a4e;
+  color:#8fa4bd;border-radius:6px;padding:6px 14px;cursor:pointer;
+  font-size:12px;transition:all 0.2s;
+}
+.ctrl-btn:hover{background:#1e2a3a;color:#38bdf8;border-color:#38bdf8}
+.ctrl-btn.active{background:#162030;color:#38bdf8;border-color:#38bdf8}
+
+#tooltip{
+  position:absolute;display:none;pointer-events:none;
+  background:rgba(8,12,24,0.95);border:1px solid #a78bfa;
+  border-radius:8px;padding:10px 14px;font-size:12px;
+  max-width:340px;line-height:1.6;box-shadow:0 4px 24px rgba(167,139,250,0.2);
+}
+#tooltip .tt-title{color:#a78bfa;font-weight:700;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div id="title">Cognee Knowledge Graph</div>
+  <div id="subtitle">DPAR 开发记忆 → Cognee 管线式分层图谱映射 &nbsp;|&nbsp; 拖拽旋转 · 滚轮缩放 · 悬停查看详情</div>
+
+  <div id="pipeline">
+    <div class="pipe-stage active">classify</div><span class="pipe-arrow">→</span>
+    <div class="pipe-stage active">chunk</div><span class="pipe-arrow">→</span>
+    <div class="pipe-stage active">extract_graph</div><span class="pipe-arrow">→</span>
+    <div class="pipe-stage active">summarize</div><span class="pipe-arrow">→</span>
+    <div class="pipe-stage active">add_data_points</div>
+    <span style="color:#4a5a7e;margin-left:8px;font-size:10px">cognify pipeline</span>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn active" onclick="setView('graph')">图谱视图</button>
+    <button class="ctrl-btn" onclick="setView('pipeline')">管线视图</button>
+    <button class="ctrl-btn" onclick="setView('top')">俯视图</button>
+    <button class="ctrl-btn" onclick="toggleEdges()">关系边</button>
+    <button class="ctrl-btn" onclick="toggleSpin()">自动旋转</button>
+  </div>
+
+  <div id="stats">
+    <div style="font-weight:600;color:#8fa4bd;margin-bottom:4px">DPAR → Cognee 映射统计</div>
+    <div><span class="stat-label">Document &nbsp;</span><span class="stat-val">168</span><span class="stat-label"> (sessions → documents)</span></div>
+    <div><span class="stat-label">DocumentChunk &nbsp;</span><span class="stat-val">10,304</span><span class="stat-label"> (observations → chunks)</span></div>
+    <div><span class="stat-label">Entity &nbsp;</span><span class="stat-val purple">6,746</span><span class="stat-label"> (unique concepts)</span></div>
+    <div><span class="stat-label">TextSummary &nbsp;</span><span class="stat-val">2,040</span><span class="stat-label"> (session_summaries)</span></div>
+    <div><span class="stat-label">Triplet &nbsp;</span><span class="stat-val purple">~31,000</span><span class="stat-label"> (facts 展开为三元组)</span></div>
+    <div style="margin-top:6px;color:#4a5a6e;font-size:11px">hughesli + ziyad 合计 · 关系边为开放类型字符串</div>
+  </div>
+
+  <div id="legend">
+    <div style="font-weight:600;margin-bottom:4px;color:#8fa4bd">Cognee 节点类型</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#f59e0b"></div>Document（sdk_sessions）</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#38bdf8"></div>DocumentChunk（observations）</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#a78bfa"></div>Entity（concepts 提取）</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#34d399"></div>TextSummary（session_summaries）</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#f472b6"></div>Triplet（facts → 三元组）</div>
+    <div class="leg-row" style="margin-top:4px"><div class="leg-dot" style="background:#ffd700;opacity:0.6"></div>跨开发者共享 Entity</div>
+  </div>
+
+  <div id="tooltip"><div class="tt-title"></div><div class="tt-body"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+
+const H = {sessions:9, obs:1624, summaries:599, concepts:1539, files:492,
+  topConcepts:['shell-command','adb','powershell','svn','ue4','log-analysis','mcp','dpar','workplan','git'],
+  obsTypes:{debugging:790,investigation:241,documentation:191,discovery:105,configuration:103,bugfix:71,learning:65,feature:44,refactor:14}};
+const Z = {sessions:159, obs:8680, summaries:1441, concepts:5207, files:1870,
+  topConcepts:['powershell','mcp','unreal-engine','file-read','debugging','svn','grep','shell-command','git','build-tools'],
+  obsTypes:{investigation:4343,debugging:2058,learning:455,feature:424,documentation:410,configuration:319,discovery:298,bugfix:223,refactor:150}};
+const SHARED = ['powershell','svn','mcp','dpar','git','debugging','shell-command','configuration'];
+
+const LAYERS = {
+  document:     {y:10, color:0xf59e0b},
+  chunk:        {y:5,  color:0x38bdf8},
+  entity:       {y:0,  color:0xa78bfa},
+  summary:      {y:-4, color:0x34d399},
+  triplet:      {y:-8, color:0xf472b6}
+};
+
+let scene, camera, renderer, controls;
+let allNodes=[], allEdges=[], edgeMeshes=[];
+let autoSpin=true, showEdges=true;
+const raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2();
+let hovered=null;
+
+function init(){
+  scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x080c18,0.008);
+
+  camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,300);
+  camera.position.set(22,12,28);
+  camera.lookAt(0,2,0);
+
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setClearColor(0x080c18);
+  document.body.insertBefore(renderer.domElement,document.getElementById('overlay'));
+
+  controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true; controls.dampingFactor=0.06;
+  controls.target.set(0,2,0);
+  controls.minDistance=8; controls.maxDistance=70;
+
+  scene.add(new THREE.AmbientLight(0x334466,0.5));
+  const d=new THREE.DirectionalLight(0xffffff,0.7); d.position.set(10,20,15); scene.add(d);
+  scene.add(new THREE.PointLight(0xa78bfa,0.3,60));
+
+  buildGrid();
+  buildGraph();
+
+  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+  addEventListener('mousemove',onMove);
+  animate();
+}
+
+function buildGrid(){
+  const pts=[], s=30, d=2;
+  for(let i=-s;i<=s;i+=d){pts.push(-s,-10,i,s,-10,i);pts.push(i,-10,-s,i,-10,s)}
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+  scene.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x121828,transparent:true,opacity:0.5})));
+
+  Object.entries(LAYERS).forEach(([k,v])=>{
+    const pg=new THREE.PlaneGeometry(50,50);
+    const pm=new THREE.MeshBasicMaterial({color:v.color,transparent:true,opacity:0.015,side:THREE.DoubleSide});
+    const p=new THREE.Mesh(pg,pm); p.rotation.x=-Math.PI/2; p.position.y=v.y;
+    scene.add(p);
+  });
+}
+
+function mkNode(x,y,z,size,color,geo,layer,label,detail,owner){
+  const mat=new THREE.MeshPhongMaterial({color,emissive:color,emissiveIntensity:0.15,transparent:true,opacity:0.85,shininess:60});
+  const m=new THREE.Mesh(geo,mat);
+  m.position.set(x,y,z); m.userData={layer,label,detail,owner};
+  scene.add(m); allNodes.push(m);
+  return m;
+}
+
+function buildGraph(){
+  const owners=[
+    {key:'hughesli',d:H,ox:-10,color:0x38bdf8},
+    {key:'ziyad',d:Z,ox:10,color:0xf59e0b}
+  ];
+
+  const entityMap={};
+
+  for(const o of owners){
+    const {key,d,ox}=o;
+
+    // Documents (sessions)
+    const docCount=Math.min(d.sessions,20);
+    const docGeo=new THREE.BoxGeometry(0.9,0.5,0.9);
+    const docs=[];
+    for(let i=0;i<docCount;i++){
+      const angle=(i/docCount)*Math.PI*2;
+      const r=3+Math.random()*2;
+      const x=ox+Math.cos(angle)*r, z=Math.sin(angle)*r;
+      const m=mkNode(x,LAYERS.document.y+Math.random()*0.5,z,0.5,LAYERS.document.color,docGeo,
+        'document',`Session ${i+1}`,`[${key}] Document\n${d.sessions} sessions total\n→ classify → chunk`,key);
+      docs.push(m);
+    }
+
+    // DocumentChunks (observations)
+    const chunkCount=Math.min(Math.floor(d.obs/25),120);
+    const chunkGeo=new THREE.BoxGeometry(0.35,0.35,0.35);
+    const typeEntries=Object.entries(d.obsTypes);
+    const chunks=[];
+    let ci=0;
+    for(const [typeName,count] of typeEntries){
+      const n=Math.max(1,Math.round(chunkCount*count/d.obs));
+      for(let i=0;i<n;i++){
+        const angle=(ci/chunkCount)*Math.PI*2+Math.random()*0.4;
+        const r=5+Math.random()*5;
+        const x=ox+Math.cos(angle)*r, z=Math.sin(angle)*r;
+        const m=mkNode(x,LAYERS.chunk.y+(Math.random()-0.5)*1.5,z,0.35,LAYERS.chunk.color,chunkGeo,
+          'chunk',typeName,`[${key}] DocumentChunk\ntype: ${typeName}\n${count} of this type / ${d.obs} total`,key);
+        chunks.push(m);
+        ci++;
+
+        if(docs.length>0){
+          const doc=docs[Math.floor(Math.random()*docs.length)];
+          addEdge(doc.position,m.position,0x3a4a6e,0.08,'is_part_of');
+        }
+      }
+    }
+
+    // Entities (concepts)
+    const entGeo=new THREE.OctahedronGeometry(0.35,0);
+    d.topConcepts.forEach((concept,i)=>{
+      const isShared=SHARED.includes(concept);
+      const angle=(i/d.topConcepts.length)*Math.PI*2;
+      const r=4+Math.random()*4;
+      const x=ox+Math.cos(angle)*r, z=Math.sin(angle)*r;
+      const c=isShared?0xffd700:LAYERS.entity.color;
+      const m=mkNode(x,LAYERS.entity.y+(Math.random()-0.5)*1.2,z,0.4,c,entGeo,
+        'entity',concept,`[${key}] Entity: ${concept}${isShared?'\n⚡ 跨开发者共享':''}
+\n${d.concepts} unique concepts total`,key);
+
+      if(!entityMap[concept]) entityMap[concept]=[];
+      entityMap[concept].push(m);
+
+      const linked=chunks.sort(()=>Math.random()-0.5).slice(0,isShared?4:2);
+      for(const ch of linked) addEdge(ch.position,m.position,isShared?0xdaa520:0x6a5acd,isShared?0.15:0.06,'contains');
+    });
+
+    // extra entity scatter
+    const scatterGeo=new THREE.OctahedronGeometry(0.18,0);
+    const scatterCount=Math.min(Math.floor(d.concepts/60),60);
+    for(let i=0;i<scatterCount;i++){
+      const angle=Math.random()*Math.PI*2;
+      const r=3+Math.random()*8;
+      mkNode(ox+Math.cos(angle)*r,LAYERS.entity.y+(Math.random()-0.5)*1.5,Math.sin(angle)*r,
+        0.18,LAYERS.entity.color,scatterGeo,'entity',`concept-${i}`,
+        `[${key}] Entity (background)\n${d.concepts} unique concepts`,key);
+    }
+
+    // TextSummaries
+    const sumCount=Math.min(Math.floor(d.summaries/30),40);
+    const sumGeo=new THREE.SphereGeometry(0.25,8,6);
+    for(let i=0;i<sumCount;i++){
+      const angle=(i/sumCount)*Math.PI*2;
+      const r=4+Math.random()*4;
+      const x=ox+Math.cos(angle)*r, z=Math.sin(angle)*r;
+      const m=mkNode(x,LAYERS.summary.y+(Math.random()-0.5)*1,z,0.25,LAYERS.summary.color,sumGeo,
+        'summary',`Summary ${i+1}`,`[${key}] TextSummary\n${d.summaries} session summaries\nmade_from: DocumentChunk`,key);
+
+      if(chunks.length>0){
+        const src=chunks[Math.floor(Math.random()*chunks.length)];
+        addEdge(src.position,m.position,0x22886a,0.06,'made_from');
+      }
+    }
+
+    // Triplets
+    const triCount=Math.min(Math.floor(d.obs/40),60);
+    const triGeo=new THREE.TetrahedronGeometry(0.2,0);
+    for(let i=0;i<triCount;i++){
+      const angle=(i/triCount)*Math.PI*2;
+      const r=5+Math.random()*6;
+      const x=ox+Math.cos(angle)*r, z=Math.sin(angle)*r;
+      mkNode(x,LAYERS.triplet.y+(Math.random()-0.5)*1.2,z,0.2,LAYERS.triplet.color,triGeo,
+        'triplet',`Triplet ${i+1}`,`[${key}] Triplet (fact triple)\nfrom observation.facts\n~${Math.round(d.obs*3)} estimated triplets`,key);
+    }
+  }
+
+  // cross-developer shared entity links
+  for(const concept of SHARED){
+    const nodes=entityMap[concept];
+    if(nodes&&nodes.length>=2){
+      const a=nodes[0].position, b=nodes[1].position;
+      addEdge(a,b,0xffd700,0.3,'same_entity');
+    }
+  }
+}
+
+function addEdge(from,to,color,opacity,type){
+  const mid=new THREE.Vector3(
+    (from.x+to.x)/2+(Math.random()-0.5)*1.5,
+    (from.y+to.y)/2+(Math.random()-0.5)*0.8,
+    (from.z+to.z)/2+(Math.random()-0.5)*1.5
+  );
+  const curve=new THREE.CatmullRomCurve3([from.clone(),mid,to.clone()]);
+  const g=new THREE.TubeGeometry(curve,10,0.015,3,false);
+  const m=new THREE.MeshBasicMaterial({color,transparent:true,opacity});
+  const mesh=new THREE.Mesh(g,m);
+  mesh.userData={isEdge:true,edgeType:type};
+  scene.add(mesh);
+  edgeMeshes.push(mesh);
+  allEdges.push({mesh,from,to,type,opacity});
+}
+
+function setView(v){
+  document.querySelectorAll('.ctrl-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  if(v==='graph'){camera.position.set(22,12,28);controls.target.set(0,2,0)}
+  else if(v==='pipeline'){camera.position.set(0,0,35);controls.target.set(0,2,0)}
+  else if(v==='top'){camera.position.set(0,30,0.1);controls.target.set(0,0,0)}
+  controls.update();
+}
+function toggleEdges(){
+  showEdges=!showEdges;
+  edgeMeshes.forEach(m=>{m.visible=showEdges});
+  event.target.classList.toggle('active',showEdges);
+}
+function toggleSpin(){
+  autoSpin=!autoSpin;
+  event.target.classList.toggle('active',autoSpin);
+}
+
+function onMove(e){
+  mouse.x=(e.clientX/innerWidth)*2-1;
+  mouse.y=-(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObjects(allNodes);
+  const tt=document.getElementById('tooltip');
+  if(hits.length){
+    const o=hits[0].object;
+    if(hovered&&hovered!==o)hovered.material.emissiveIntensity=hovered.userData._oe??0.15;
+    hovered=o; o.userData._oe=o.userData._oe??o.material.emissiveIntensity;
+    o.material.emissiveIntensity=0.8;
+    tt.style.display='block';
+    tt.style.left=(e.clientX+16)+'px'; tt.style.top=(e.clientY-10)+'px';
+    tt.querySelector('.tt-title').textContent=o.userData.label;
+    tt.querySelector('.tt-body').textContent=o.userData.detail;
+    document.body.style.cursor='pointer';
+  } else {
+    if(hovered){hovered.material.emissiveIntensity=hovered.userData._oe??0.15;hovered=null}
+    tt.style.display='none'; document.body.style.cursor='default';
+  }
+}
+
+let time=0;
+function animate(){
+  requestAnimationFrame(animate);
+  time+=0.004;
+
+  if(autoSpin){
+    const t=controls.target, off=camera.position.clone().sub(t);
+    const a=0.0015, c=Math.cos(a), s=Math.sin(a);
+    camera.position.set(t.x+off.x*c-off.z*s, camera.position.y, t.z+off.x*s+off.z*c);
+  }
+
+  allNodes.forEach((n,i)=>{
+    if(n.userData.layer==='entity'){
+      n.rotation.y+=0.008; n.rotation.x=Math.sin(time+i)*0.1;
+      n.position.y=LAYERS.entity.y+Math.sin(time*2+i*0.7)*0.25;
+    } else if(n.userData.layer==='summary'){
+      n.position.y=LAYERS.summary.y+Math.sin(time*1.5+i*0.5)*0.15;
+    } else if(n.userData.layer==='triplet'){
+      n.rotation.y+=0.012;
+    }
+  });
+
+  edgeMeshes.forEach((m,i)=>{
+    if(m.userData.edgeType==='same_entity'){
+      m.material.opacity=0.2+Math.sin(time*3+i)*0.1;
+    }
+  });
+
+  controls.update();
+  renderer.render(scene,camera);
+}
+
+init();
+</script>
+</body>
+</html>

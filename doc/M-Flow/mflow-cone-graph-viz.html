@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>M-Flow Cone Graph — DPAR Memory Import Visualization</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e1a; color: #c8d6e5; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+canvas { display: block; }
+
+#overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 10;
+}
+#title {
+  position: absolute; top: 24px; left: 32px;
+  font-size: 22px; font-weight: 700; letter-spacing: 1px;
+  background: linear-gradient(90deg, #00d2ff, #7b61ff);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+#subtitle { position: absolute; top: 54px; left: 32px; font-size: 13px; color: #6b7c93; }
+
+#legend {
+  position: absolute; bottom: 28px; right: 32px;
+  background: rgba(10,14,26,0.85); border: 1px solid #1e2a3a;
+  border-radius: 10px; padding: 16px 20px; font-size: 13px; line-height: 2;
+}
+.leg-row { display: flex; align-items: center; gap: 10px; }
+.leg-dot { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+#stats {
+  position: absolute; bottom: 28px; left: 32px;
+  background: rgba(10,14,26,0.85); border: 1px solid #1e2a3a;
+  border-radius: 10px; padding: 16px 20px; font-size: 13px; line-height: 1.9;
+}
+.stat-label { color: #6b7c93; }
+.stat-val { color: #00d2ff; font-weight: 600; }
+.stat-val.orange { color: #ff8c42; }
+
+#tooltip {
+  position: absolute; display: none; pointer-events: none;
+  background: rgba(10,14,26,0.92); border: 1px solid #7b61ff;
+  border-radius: 8px; padding: 10px 14px; font-size: 12px;
+  max-width: 320px; line-height: 1.6; box-shadow: 0 4px 24px rgba(123,97,255,0.2);
+}
+#tooltip .tt-title { color: #7b61ff; font-weight: 700; margin-bottom: 4px; }
+
+#controls {
+  position: absolute; top: 24px; right: 32px;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: all;
+}
+.ctrl-btn {
+  background: rgba(30,42,58,0.8); border: 1px solid #2a3a4e;
+  color: #8fa4bd; border-radius: 6px; padding: 6px 14px; cursor: pointer;
+  font-size: 12px; transition: all 0.2s;
+}
+.ctrl-btn:hover { background: #1e2a3a; color: #00d2ff; border-color: #00d2ff; }
+.ctrl-btn.active { background: #162030; color: #00d2ff; border-color: #00d2ff; }
+
+#layer-labels {
+  position: absolute; left: 32px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0; font-size: 11px;
+}
+.layer-tag {
+  padding: 4px 10px; border-left: 3px solid; background: rgba(10,14,26,0.7);
+  border-radius: 0 4px 4px 0; margin-bottom: 2px; white-space: nowrap;
+}
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div id="title">M-Flow Cone Graph</div>
+  <div id="subtitle">DPAR 开发记忆 → Cone Graph 锥形图谱映射 &nbsp;|&nbsp; 拖拽旋转 · 滚轮缩放 · 点击节点查看详情</div>
+
+  <div id="controls">
+    <button class="ctrl-btn active" onclick="toggleView('cone')">锥形视图</button>
+    <button class="ctrl-btn" onclick="toggleView('explode')">分层展开</button>
+    <button class="ctrl-btn" onclick="toggleView('top')">俯视图</button>
+    <button class="ctrl-btn" onclick="toggleAnchor()">Entity 锚线</button>
+    <button class="ctrl-btn" onclick="toggleSpin()">自动旋转</button>
+  </div>
+
+  <div id="stats">
+    <div><span class="stat-label">hughesli &nbsp;</span><span class="stat-val">9</span><span class="stat-label"> sessions · </span><span class="stat-val">1,624</span><span class="stat-label"> obs · </span><span class="stat-val">1,539</span><span class="stat-label"> concepts</span></div>
+    <div><span class="stat-label">ziyad &nbsp;</span><span class="stat-val orange">159</span><span class="stat-label"> sessions · </span><span class="stat-val orange">8,680</span><span class="stat-label"> obs · </span><span class="stat-val orange">5,207</span><span class="stat-label"> concepts</span></div>
+    <div style="margin-top:6px;color:#6b7c93;font-size:11px">合计 10,304 observations → Cone Graph 四层结构</div>
+  </div>
+
+  <div id="legend">
+    <div style="font-weight:600;margin-bottom:4px;color:#8fa4bd;">图层映射</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#ff8c42"></div>Entity 实体锚线（concepts 穿透全层）</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#00d2ff"></div>Episode 情景（session_summaries）</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#7b61ff"></div>Facet 切面（observations 按 type 聚合）</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#27ae60"></div>FacetPoint 切面点（每条 observation）</div>
+  </div>
+
+  <div id="tooltip"><div class="tt-title"></div><div class="tt-body"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = {
+  hughesli: {
+    color: 0x00d2ff,
+    sessions: 9, observations: 1624, summaries: 599, concepts: 1539, files: 492,
+    obsTypes: { debugging: 790, investigation: 241, documentation: 191, discovery: 105, configuration: 103, bugfix: 71, learning: 65, feature: 44, refactor: 14 },
+    topConcepts: ['shell-command','adb','powershell','svn','ue4','log-analysis','mcp','dpar','workplan','git','ugc','configuration','pipeline','project-planning','build process']
+  },
+  ziyad: {
+    color: 0xff8c42,
+    sessions: 159, observations: 8680, summaries: 1441, concepts: 5207, files: 1870,
+    obsTypes: { investigation: 4343, debugging: 2058, learning: 455, feature: 424, documentation: 410, configuration: 319, discovery: 298, bugfix: 223, refactor: 150 },
+    topConcepts: ['powershell','mcp','unreal-engine','file-read','debugging','svn','grep','shell-command','git','build-tools','local-build','dpar','configuration','asset management','empty-result']
+  }
+};
+const SHARED_ENTITIES = ['powershell','svn','mcp','dpar','git','configuration','shell-command','ue4','debugging','pipeline'];
+
+const LAYER = {
+  facetpoint: { y: 0, color: 0x27ae60, label: 'FacetPoint' },
+  facet:      { y: 4, color: 0x7b61ff, label: 'Facet' },
+  episode:    { y: 8, color: 0x00d2ff, label: 'Episode' },
+  entity:     { y: 12, color: 0xff8c42, label: 'Entity' }
+};
+
+let scene, camera, renderer, controls;
+let allNodes = [], anchorLines = [], entitySpheres = [];
+let autoSpin = true, showAnchors = true, currentView = 'cone';
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function init() {
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0e1a, 0.012);
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(18, 14, 22);
+  camera.lookAt(0, 5, 0);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x0a0e1a);
+  document.body.insertBefore(renderer.domElement, document.getElementById('overlay'));
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.target.set(0, 5, 0);
+  controls.minDistance = 8;
+  controls.maxDistance = 60;
+
+  const ambLight = new THREE.AmbientLight(0x334466, 0.6);
+  scene.add(ambLight);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(10, 20, 15);
+  scene.add(dirLight);
+  const pointLight = new THREE.PointLight(0x7b61ff, 0.4, 50);
+  pointLight.position.set(-5, 10, -5);
+  scene.add(pointLight);
+
+  buildConeGraph();
+  buildGridFloor();
+
+  window.addEventListener('resize', onResize);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('click', onClick);
+  animate();
+}
+
+function buildGridFloor() {
+  const gridGeo = new THREE.BufferGeometry();
+  const pts = [];
+  const s = 25, d = 2;
+  for (let i = -s; i <= s; i += d) {
+    pts.push(-s, -0.5, i, s, -0.5, i);
+    pts.push(i, -0.5, -s, i, -0.5, s);
+  }
+  gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const gridMat = new THREE.LineBasicMaterial({ color: 0x1a2233, transparent: true, opacity: 0.4 });
+  scene.add(new THREE.LineSegments(gridGeo, gridMat));
+}
+
+function createNode(x, y, z, size, color, layer, label, detail, owner) {
+  let mesh;
+  if (layer === 'entity') {
+    const geo = new THREE.OctahedronGeometry(size, 0);
+    const mat = new THREE.MeshPhongMaterial({
+      color, emissive: color, emissiveIntensity: 0.3,
+      transparent: true, opacity: 0.9, shininess: 80
+    });
+    mesh = new THREE.Mesh(geo, mat);
+  } else if (layer === 'episode') {
+    const geo = new THREE.BoxGeometry(size * 1.2, size * 0.8, size * 1.2);
+    const mat = new THREE.MeshPhongMaterial({
+      color, emissive: color, emissiveIntensity: 0.15,
+      transparent: true, opacity: 0.85
+    });
+    mesh = new THREE.Mesh(geo, mat);
+  } else if (layer === 'facet') {
+    const geo = new THREE.CylinderGeometry(size * 0.5, size * 0.7, size * 0.9, 6);
+    const mat = new THREE.MeshPhongMaterial({
+      color, emissive: color, emissiveIntensity: 0.1,
+      transparent: true, opacity: 0.8
+    });
+    mesh = new THREE.Mesh(geo, mat);
+  } else {
+    const geo = new THREE.BoxGeometry(size, size, size);
+    const mat = new THREE.MeshPhongMaterial({
+      color, emissive: color, emissiveIntensity: 0.08,
+      transparent: true, opacity: 0.75
+    });
+    mesh = new THREE.Mesh(geo, mat);
+  }
+  mesh.position.set(x, y, z);
+  mesh.userData = { layer, label, detail, owner };
+  scene.add(mesh);
+  allNodes.push(mesh);
+  return mesh;
+}
+
+function buildConeGraph() {
+  const coneRadius = [12, 8, 5, 2.5];
+  const layerKeys = ['facetpoint', 'facet', 'episode', 'entity'];
+
+  // hughesli on the left side, ziyad on the right
+  const offsetX = { hughesli: -8, ziyad: 8 };
+
+  for (const [owner, data] of Object.entries(DATA)) {
+    const ox = offsetX[owner];
+    const ownerColor = owner === 'hughesli' ? 0x00bbee : 0xff9955;
+
+    // Layer 0: FacetPoints — sample from observations
+    const fpCount = Math.min(Math.floor(data.observations / 20), 80);
+    const fpRadius = coneRadius[0] * (data.observations / 10000 + 0.5);
+    const typeEntries = Object.entries(data.obsTypes);
+    let fpIdx = 0;
+    for (const [typeName, count] of typeEntries) {
+      const typeNodes = Math.max(1, Math.round(fpCount * count / data.observations));
+      for (let i = 0; i < typeNodes; i++) {
+        const angle = (fpIdx / fpCount) * Math.PI * 2 + Math.random() * 0.3;
+        const r = fpRadius * (0.3 + Math.random() * 0.7);
+        const x = ox + Math.cos(angle) * r;
+        const z = Math.sin(angle) * r;
+        const y = LAYER.facetpoint.y + (Math.random() - 0.5) * 0.8;
+        createNode(x, y, z, 0.25, LAYER.facetpoint.color, 'facetpoint', typeName,
+          `[${owner}] ${typeName} observation\n${count} total of this type`, owner);
+        fpIdx++;
+      }
+    }
+
+    // Layer 1: Facets — one per observation type
+    const facetRadius = coneRadius[1] * 0.7;
+    typeEntries.forEach(([typeName, count], i) => {
+      const angle = (i / typeEntries.length) * Math.PI * 2;
+      const r = facetRadius * (0.5 + 0.5 * (count / data.observations * 3));
+      const x = ox + Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+      const size = 0.3 + (count / data.observations) * 1.5;
+      createNode(x, LAYER.facet.y + (Math.random() - 0.5) * 0.5, z,
+        Math.min(size, 0.7), LAYER.facet.color, 'facet', typeName,
+        `[${owner}] Facet: ${typeName}\n${count} observations → ${Math.ceil(count/10)} facets`, owner);
+    });
+
+    // Layer 2: Episodes — session summaries
+    const epCount = Math.min(Math.ceil(data.summaries / 40), 36);
+    const epRadius = coneRadius[2] * 0.8;
+    for (let i = 0; i < epCount; i++) {
+      const angle = (i / epCount) * Math.PI * 2;
+      const r = epRadius * (0.4 + Math.random() * 0.6);
+      const x = ox + Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+      createNode(x, LAYER.episode.y + (Math.random() - 0.5) * 0.6, z,
+        0.45, LAYER.episode.color, 'episode', `Session ${i+1}`,
+        `[${owner}] Episode (session summary)\n${data.summaries} total summaries\n${data.sessions} sessions`, owner);
+    }
+
+    // Layer 3: Entities — top concepts
+    data.topConcepts.forEach((concept, i) => {
+      const angle = (i / data.topConcepts.length) * Math.PI * 2;
+      const r = coneRadius[3] * (0.6 + Math.random() * 0.8);
+      const x = ox + Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+      const isShared = SHARED_ENTITIES.includes(concept);
+      const sphere = createNode(x, LAYER.entity.y + (Math.random() - 0.5) * 0.5, z,
+        isShared ? 0.55 : 0.4, LAYER.entity.color, 'entity', concept,
+        `[${owner}] Entity: ${concept}${isShared ? '\n⚡ 两人共享概念' : ''}\n穿透所有层级的锚线`, owner);
+      entitySpheres.push({ mesh: sphere, owner, concept, isShared });
+    });
+  }
+
+  buildAnchorLines();
+  buildConeWireframe();
+  buildLayerRings();
+  buildCrossLinks();
+}
+
+function buildAnchorLines() {
+  anchorLines.forEach(l => scene.remove(l));
+  anchorLines = [];
+
+  for (const es of entitySpheres) {
+    const ep = es.mesh.position;
+    const relatedNodes = allNodes.filter(n =>
+      n.userData.owner === es.owner && n.userData.layer !== 'entity'
+    );
+    const sampleCount = Math.min(relatedNodes.length, es.isShared ? 6 : 3);
+    const sampled = relatedNodes.sort(() => Math.random() - 0.5).slice(0, sampleCount);
+
+    for (const target of sampled) {
+      const tp = target.position;
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(ep.x, ep.y, ep.z),
+        new THREE.Vector3((ep.x + tp.x) / 2 + (Math.random() - 0.5) * 0.8,
+                          (ep.y + tp.y) / 2,
+                          (ep.z + tp.z) / 2 + (Math.random() - 0.5) * 0.8),
+        new THREE.Vector3(tp.x, tp.y, tp.z)
+      ]);
+      const geo = new THREE.TubeGeometry(curve, 12, 0.02, 4, false);
+      const mat = new THREE.MeshBasicMaterial({
+        color: es.isShared ? 0xffd700 : 0xff8c42,
+        transparent: true, opacity: es.isShared ? 0.35 : 0.15
+      });
+      const tube = new THREE.Mesh(geo, mat);
+      tube.userData = { isAnchor: true };
+      scene.add(tube);
+      anchorLines.push(tube);
+    }
+  }
+}
+
+function buildConeWireframe() {
+  for (const ox of [-8, 8]) {
+    const label = ox < 0 ? 'hughesli' : 'ziyad';
+    const radii = [12, 7, 4.5, 2.5];
+    const heights = [0, 4, 8, 12];
+
+    for (let li = 0; li < 4; li++) {
+      const segments = 32;
+      const pts = [];
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const r = radii[li] * (label === 'hughesli' ? 0.55 : 0.75);
+        pts.push(new THREE.Vector3(
+          ox + Math.cos(angle) * r,
+          heights[li],
+          Math.sin(angle) * r
+        ));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({
+        color: ox < 0 ? 0x00667a : 0x7a4400,
+        transparent: true, opacity: 0.25
+      });
+      scene.add(new THREE.Line(geo, mat));
+    }
+
+    // vertical cone lines
+    const vCount = 8;
+    for (let i = 0; i < vCount; i++) {
+      const angle = (i / vCount) * Math.PI * 2;
+      const scale = label === 'hughesli' ? 0.55 : 0.75;
+      const pts = radii.map((r, li) => new THREE.Vector3(
+        ox + Math.cos(angle) * r * scale,
+        heights[li],
+        Math.sin(angle) * r * scale
+      ));
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({
+        color: ox < 0 ? 0x003344 : 0x442200,
+        transparent: true, opacity: 0.15
+      });
+      scene.add(new THREE.Line(geo, mat));
+    }
+  }
+}
+
+function buildLayerRings() {
+  const layers = [
+    { y: 0, label: 'FacetPoint', color: 0x27ae60 },
+    { y: 4, label: 'Facet', color: 0x7b61ff },
+    { y: 8, label: 'Episode', color: 0x00d2ff },
+    { y: 12, label: 'Entity', color: 0xff8c42 }
+  ];
+  for (const l of layers) {
+    const geo = new THREE.PlaneGeometry(38, 0.01);
+    const mat = new THREE.MeshBasicMaterial({
+      color: l.color, transparent: true, opacity: 0.03, side: THREE.DoubleSide
+    });
+    const plane = new THREE.Mesh(geo, mat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.y = l.y;
+    scene.add(plane);
+  }
+}
+
+function buildCrossLinks() {
+  const hughesEntities = entitySpheres.filter(e => e.owner === 'hughesli' && e.isShared);
+  const ziyadEntities = entitySpheres.filter(e => e.owner === 'ziyad' && e.isShared);
+
+  for (const he of hughesEntities) {
+    const ze = ziyadEntities.find(z => z.concept === he.concept);
+    if (ze) {
+      const hp = he.mesh.position;
+      const zp = ze.mesh.position;
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(hp.x, hp.y, hp.z),
+        new THREE.Vector3(0, hp.y + 1.5, (hp.z + zp.z) / 2),
+        new THREE.Vector3(zp.x, zp.y, zp.z)
+      ]);
+      const geo = new THREE.TubeGeometry(curve, 20, 0.03, 4, false);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffd700, transparent: true, opacity: 0.4
+      });
+      const tube = new THREE.Mesh(geo, mat);
+      tube.userData = { isAnchor: true, isCross: true };
+      scene.add(tube);
+      anchorLines.push(tube);
+    }
+  }
+}
+
+function toggleView(view) {
+  currentView = view;
+  document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (view === 'cone') {
+    camera.position.set(18, 14, 22);
+    controls.target.set(0, 5, 0);
+  } else if (view === 'explode') {
+    camera.position.set(0, 30, 25);
+    controls.target.set(0, 6, 0);
+    allNodes.forEach(n => {
+      const ly = n.userData.layer;
+      const baseY = LAYER[ly]?.y ?? 0;
+      const spread = { facetpoint: 0, facet: 6, episode: 12, entity: 18 };
+      n.position.y = (spread[ly] ?? baseY) + (Math.random() - 0.5) * 0.5;
+    });
+  } else if (view === 'top') {
+    camera.position.set(0, 35, 0.1);
+    controls.target.set(0, 0, 0);
+  }
+  controls.update();
+}
+
+function toggleAnchor() {
+  showAnchors = !showAnchors;
+  anchorLines.forEach(l => { l.visible = showAnchors; });
+  event.target.classList.toggle('active', showAnchors);
+}
+
+function toggleSpin() {
+  autoSpin = !autoSpin;
+  event.target.classList.toggle('active', autoSpin);
+}
+
+let hovered = null;
+function onMouseMove(e) {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(allNodes);
+  const tooltip = document.getElementById('tooltip');
+
+  if (hits.length > 0) {
+    const obj = hits[0].object;
+    if (hovered && hovered !== obj) {
+      hovered.material.emissiveIntensity = hovered.userData._origEmissive ?? 0.1;
+    }
+    hovered = obj;
+    obj.userData._origEmissive = obj.userData._origEmissive ?? obj.material.emissiveIntensity;
+    obj.material.emissiveIntensity = 0.8;
+
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 16) + 'px';
+    tooltip.style.top = (e.clientY - 10) + 'px';
+    tooltip.querySelector('.tt-title').textContent = obj.userData.label;
+    tooltip.querySelector('.tt-body').textContent = obj.userData.detail;
+    document.body.style.cursor = 'pointer';
+  } else {
+    if (hovered) {
+      hovered.material.emissiveIntensity = hovered.userData._origEmissive ?? 0.1;
+      hovered = null;
+    }
+    tooltip.style.display = 'none';
+    document.body.style.cursor = 'default';
+  }
+}
+
+function onClick(e) {
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(allNodes);
+  if (hits.length > 0) {
+    const obj = hits[0].object;
+    if (obj.userData.layer === 'entity') {
+      anchorLines.forEach(l => {
+        if (l.userData.isAnchor) l.material.opacity = 0.05;
+      });
+      const related = anchorLines.filter(l => {
+        const lp = l.position || new THREE.Vector3();
+        return true;
+      });
+      setTimeout(() => {
+        anchorLines.forEach(l => {
+          if (l.userData.isAnchor) {
+            l.material.opacity = l.userData.isCross ? 0.4 : (0.15 + Math.random() * 0.2);
+          }
+        });
+      }, 2000);
+    }
+  }
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+let time = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  time += 0.005;
+
+  if (autoSpin) {
+    const target = controls.target;
+    const offset = camera.position.clone().sub(target);
+    const angle = 0.002;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    const x = offset.x * cos - offset.z * sin;
+    const z = offset.x * sin + offset.z * cos;
+    camera.position.set(target.x + x, camera.position.y, target.z + z);
+  }
+
+  allNodes.forEach((n, i) => {
+    if (n.userData.layer === 'entity') {
+      n.rotation.y += 0.01;
+      n.position.y = LAYER.entity.y + Math.sin(time * 2 + i) * 0.3;
+    } else if (n.userData.layer === 'episode') {
+      n.position.y = LAYER.episode.y + Math.sin(time * 1.5 + i * 0.5) * 0.15;
+    }
+  });
+
+  // pulse shared entity connections
+  anchorLines.forEach((l, i) => {
+    if (l.userData.isCross) {
+      l.material.opacity = 0.25 + Math.sin(time * 3 + i) * 0.15;
+    }
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+init();
+</script>
+</body>
+</html>
