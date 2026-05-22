@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 记忆系统第一性原理总览</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Noto+Serif+SC:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;500&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: #1a1a25;
+  --bg-elevated: #222233;
+  --text-primary: #e8e4dd;
+  --text-secondary: #9d9a93;
+  --text-muted: #5d5a55;
+  --accent-gold: #d4a853;
+  --accent-amber: #e8a838;
+  --accent-warm: #c47832;
+  --accent-copper: #b87333;
+  --accent-teal: #4ecdc4;
+  --accent-blue: #5b8dee;
+  --accent-purple: #9b7ed8;
+  --accent-rose: #e06c75;
+  --border-subtle: rgba(212, 168, 83, 0.15);
+  --border-medium: rgba(212, 168, 83, 0.3);
+  --gradient-gold: linear-gradient(135deg, #d4a853, #e8a838, #c47832);
+  --gradient-dark: linear-gradient(180deg, #0a0a0f 0%, #12121a 100%);
+  --shadow-glow: 0 0 40px rgba(212, 168, 83, 0.08);
+  --font-display: 'Playfair Display', 'Noto Serif SC', serif;
+  --font-body: 'Noto Sans SC', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-serif: 'Noto Serif SC', serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  line-height: 1.8;
+  overflow-x: hidden;
+}
+
+/* Noise texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--accent-gold); border-radius: 3px; }
+
+/* Hero Section */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  padding: 4rem 2rem;
+  text-align: center;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(ellipse at center, rgba(212, 168, 83, 0.04) 0%, transparent 50%);
+  animation: rotateGlow 30s linear infinite;
+}
+
+@keyframes rotateGlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.2rem;
+  border: 1px solid var(--border-medium);
+  border-radius: 2rem;
+  font-size: 0.8rem;
+  color: var(--accent-gold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  margin-bottom: 3rem;
+  backdrop-filter: blur(10px);
+  animation: fadeInDown 1s ease-out;
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-weight: 900;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+  background: var(--gradient-gold);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fadeInUp 1s ease-out 0.2s both;
+}
+
+.hero-subtitle {
+  font-family: var(--font-serif);
+  font-size: clamp(1rem, 2vw, 1.4rem);
+  color: var(--text-secondary);
+  max-width: 700px;
+  margin-bottom: 3rem;
+  animation: fadeInUp 1s ease-out 0.4s both;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 3rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  animation: fadeInUp 1s ease-out 0.6s both;
+}
+
+.hero-stat {
+  text-align: center;
+}
+
+.hero-stat-number {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--accent-gold);
+}
+
+.hero-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.scroll-indicator {
+  position: absolute;
+  bottom: 3rem;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: bounce 2s infinite;
+}
+
+.scroll-indicator::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, var(--accent-gold), transparent);
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(10px); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Navigation */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 1rem 2rem;
+  backdrop-filter: blur(20px);
+  background: rgba(10, 10, 15, 0.8);
+  border-bottom: 1px solid var(--border-subtle);
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+
+.nav.visible { transform: translateY(0); }
+
+.nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-logo {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--accent-gold);
+  font-weight: 700;
+}
+
+.nav-links {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+}
+
+.nav-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: color 0.3s;
+}
+
+.nav-links a:hover { color: var(--accent-gold); }
+
+/* Main Content */
+.content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Section Styles */
+.section {
+  padding: 6rem 0;
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.section-header {
+  margin-bottom: 4rem;
+}
+
+.section-number {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent-gold);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  line-height: 1.3;
+}
+
+.section-desc {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  max-width: 700px;
+  font-family: var(--font-serif);
+}
+
+/* Pull Quote */
+.pull-quote {
+  position: relative;
+  padding: 2.5rem 3rem;
+  margin: 3rem 0;
+  border-left: 3px solid var(--accent-gold);
+  background: linear-gradient(135deg, rgba(212, 168, 83, 0.05), transparent);
+  border-radius: 0 12px 12px 0;
+}
+
+.pull-quote p {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  color: var(--text-primary);
+  line-height: 1.9;
+  font-weight: 600;
+}
+
+.pull-quote::before {
+  content: '"';
+  position: absolute;
+  top: -10px;
+  left: 20px;
+  font-family: var(--font-display);
+  font-size: 5rem;
+  color: var(--accent-gold);
+  opacity: 0.3;
+}
+
+/* Five Questions Grid */
+.questions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin: 3rem 0;
+}
+
+.question-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 2rem;
+  transition: all 0.4s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.question-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-gold);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.question-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-glow);
+}
+
+.question-card:hover::before { opacity: 1; }
+
+.question-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 1.2rem;
+  background: rgba(212, 168, 83, 0.1);
+}
+
+.question-name {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.question-essence {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.8rem;
+}
+
+.question-analogy {
+  font-size: 0.8rem;
+  color: var(--accent-gold);
+  font-family: var(--font-mono);
+}
+
+/* Five Layer Model */
+.layer-model {
+  position: relative;
+  margin: 4rem 0;
+}
+
+.layer-item {
+  position: relative;
+  padding: 2rem 2.5rem;
+  margin-bottom: 2px;
+  background: var(--bg-card);
+  border-left: 4px solid;
+  transition: all 0.4s ease;
+  cursor: default;
+}
+
+.layer-item:nth-child(1) { border-left-color: #e06c75; background: linear-gradient(90deg, rgba(224, 108, 117, 0.08), var(--bg-card)); }
+.layer-item:nth-child(2) { border-left-color: #d4a853; background: linear-gradient(90deg, rgba(212, 168, 83, 0.08), var(--bg-card)); }
+.layer-item:nth-child(3) { border-left-color: #4ecdc4; background: linear-gradient(90deg, rgba(78, 205, 196, 0.08), var(--bg-card)); }
+.layer-item:nth-child(4) { border-left-color: #5b8dee; background: linear-gradient(90deg, rgba(91, 141, 238, 0.08), var(--bg-card)); }
+.layer-item:nth-child(5) { border-left-color: #9b7ed8; background: linear-gradient(90deg, rgba(155, 126, 216, 0.08), var(--bg-card)); }
+
+.layer-item:first-child { border-radius: 16px 16px 0 0; }
+.layer-item:last-child { border-radius: 0 0 16px 16px; }
+
+.layer-item:hover {
+  transform: translateX(8px);
+  box-shadow: var(--shadow-glow);
+}
+
+.layer-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.layer-number {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 900;
+  opacity: 0.4;
+}
+
+.layer-title {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.layer-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding-left: 3.5rem;
+}
+
+.layer-coverage {
+  display: inline-block;
+  margin-top: 0.8rem;
+  margin-left: 3.5rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+}
+
+/* Project Mapping Table */
+.project-table-wrapper {
+  overflow-x: auto;
+  margin: 3rem 0;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+}
+
+.project-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.project-table th {
+  padding: 1rem 1.2rem;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent-gold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(212, 168, 83, 0.03);
+  white-space: nowrap;
+}
+
+.project-table td {
+  padding: 0.8rem 1.2rem;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  vertical-align: middle;
+}
+
+.project-table tr:hover td {
+  background: rgba(212, 168, 83, 0.03);
+}
+
+.project-table .project-name {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.dot-full { color: var(--accent-teal); }
+.dot-half { color: var(--accent-amber); }
+.dot-empty { color: var(--text-muted); }
+
+/* Retrieval Paradigms */
+.paradigm-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin: 3rem 0;
+}
+
+.paradigm-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.paradigm-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(to top, rgba(212, 168, 83, 0.03), transparent);
+}
+
+.paradigm-number {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--accent-gold);
+  opacity: 0.2;
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+}
+
+.paradigm-title {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  color: var(--text-primary);
+}
+
+.paradigm-projects {
+  font-size: 0.8rem;
+  color: var(--accent-gold);
+  font-family: var(--font-mono);
+  margin-bottom: 0.8rem;
+}
+
+.paradigm-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.paradigm-cognitive {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Similarity vs Relevance */
+.vs-section {
+  background: var(--bg-secondary);
+  border-radius: 24px;
+  padding: 4rem 3rem;
+  margin: 4rem 0;
+  border: 1px solid var(--border-subtle);
+  position: relative;
+  overflow: hidden;
+}
+
+.vs-section::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 168, 83, 0.06), transparent);
+}
+
+.vs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  margin: 2rem 0;
+}
+
+@media (max-width: 768px) {
+  .vs-grid { grid-template-columns: 1fr; }
+}
+
+.vs-column h4 {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid;
+}
+
+.vs-column:first-child h4 { border-color: var(--accent-rose); color: var(--accent-rose); }
+.vs-column:last-child h4 { border-color: var(--accent-teal); color: var(--accent-teal); }
+
+.vs-item {
+  padding: 0.6rem 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.vs-item::before {
+  content: '→';
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Scenario Cards */
+.scenario-cards {
+  display: grid;
+  gap: 2rem;
+  margin: 3rem 0;
+}
+
+.scenario-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 600px) {
+  .scenario-card { grid-template-columns: 1fr; }
+}
+
+.scenario-num {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 900;
+  background: rgba(212, 168, 83, 0.1);
+  color: var(--accent-gold);
+  flex-shrink: 0;
+}
+
+.scenario-title {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.scenario-example {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: 1rem;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  margin: 0.8rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.scenario-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.scenario-bad, .scenario-good {
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.scenario-bad {
+  background: rgba(224, 108, 117, 0.08);
+  border: 1px solid rgba(224, 108, 117, 0.2);
+}
+
+.scenario-good {
+  background: rgba(78, 205, 196, 0.08);
+  border: 1px solid rgba(78, 205, 196, 0.2);
+}
+
+.scenario-bad .label { color: var(--accent-rose); font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
+.scenario-good .label { color: var(--accent-teal); font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* Principles */
+.principles-grid {
+  display: grid;
+  gap: 2rem;
+  margin: 3rem 0;
+}
+
+.principle-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 2.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s ease;
+}
+
+.principle-card:hover {
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-glow);
+}
+
+.principle-card::before {
+  content: attr(data-num);
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
+  font-family: var(--font-display);
+  font-size: 5rem;
+  font-weight: 900;
+  color: var(--accent-gold);
+  opacity: 0.06;
+  line-height: 1;
+}
+
+.principle-title {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  color: var(--text-primary);
+}
+
+.principle-subtitle {
+  font-size: 0.85rem;
+  color: var(--accent-gold);
+  font-family: var(--font-mono);
+  margin-bottom: 1rem;
+}
+
+.principle-body {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.principle-diagram {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: rgba(0,0,0,0.3);
+  border-radius: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+/* Topology Section */
+.topology-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin: 3rem 0;
+}
+
+.topology-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.4s ease;
+}
+
+.topology-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-medium);
+}
+
+.topology-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topology-icon svg {
+  width: 64px;
+  height: 64px;
+}
+
+.topology-name {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.topology-projects {
+  font-size: 0.8rem;
+  color: var(--accent-gold);
+  font-family: var(--font-mono);
+  margin-bottom: 0.8rem;
+}
+
+.topology-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Insights Section */
+.insight-block {
+  padding: 2.5rem;
+  margin: 2rem 0;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  position: relative;
+}
+
+.insight-block::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--gradient-gold);
+  border-radius: 16px 16px 0 0;
+}
+
+.insight-number {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--accent-gold);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+}
+
+.insight-title {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.insight-body {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.9;
+}
+
+/* Trade-off Space */
+.tradeoff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.tradeoff-item {
+  padding: 1.5rem;
+  background: rgba(0,0,0,0.2);
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.tradeoff-axis {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+}
+
+.tradeoff-left { color: var(--accent-teal); }
+.tradeoff-right { color: var(--accent-rose); }
+
+.tradeoff-bar {
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent-teal), var(--accent-rose));
+  border-radius: 2px;
+  margin-bottom: 0.8rem;
+  opacity: 0.5;
+}
+
+.tradeoff-examples {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Generation Timeline */
+.timeline {
+  position: relative;
+  margin: 3rem 0;
+  padding-left: 3rem;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--accent-gold), var(--accent-teal), var(--accent-purple));
+}
+
+.timeline-item {
+  position: relative;
+  padding: 2rem 0;
+  padding-left: 2rem;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -3rem;
+  top: 2.5rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-gold);
+  background: var(--bg-primary);
+}
+
+.timeline-gen {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent-gold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.timeline-title {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.timeline-desc {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.timeline-projects {
+  margin-top: 0.8rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.timeline-tag {
+  padding: 0.2rem 0.6rem;
+  background: rgba(212, 168, 83, 0.1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+/* Footer */
+.footer {
+  padding: 4rem 2rem;
+  text-align: center;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4rem;
+}
+
+.footer-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.footer-logo {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--accent-gold);
+  margin-bottom: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .content { padding: 0 1.2rem; }
+  .hero { padding: 3rem 1.2rem; }
+  .hero-stats { gap: 1.5rem; }
+  .vs-section { padding: 2rem 1.5rem; }
+  .principle-card { padding: 1.5rem; }
+  .scenario-comparison { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+}
+
+/* Diagram SVG styles */
+.diagram-container {
+  margin: 3rem 0;
+  padding: 2rem;
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  text-align: center;
+  overflow-x: auto;
+}
+
+.diagram-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Life cycle diagram */
+.lifecycle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 2rem 0;
+  padding: 2rem;
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+}
+
+.lifecycle-step {
+  padding: 0.6rem 1.2rem;
+  background: rgba(212, 168, 83, 0.08);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.lifecycle-arrow {
+  color: var(--accent-gold);
+  font-size: 1.2rem;
+}
+
+/* Key insight callout */
+.callout {
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.06), rgba(91, 141, 238, 0.06));
+  border: 1px solid rgba(78, 205, 196, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  margin: 2rem 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.callout strong {
+  color: var(--accent-teal);
+}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <div class="nav-logo">Memory Research</div>
+    <ul class="nav-links">
+      <li><a href="#meta">元问题</a></li>
+      <li><a href="#model">五层模型</a></li>
+      <li><a href="#retrieval">检索范式</a></li>
+      <li><a href="#principles">设计原理</a></li>
+      <li><a href="#topology">组织拓扑</a></li>
+      <li><a href="#insights">行业洞察</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Hero -->
+<header class="hero">
+  <div class="hero-badge">◆ 基于完整源码分析 ◆</div>
+  <h1 class="hero-title">AI 记忆系统<br>第一性原理总览</h1>
+  <p class="hero-subtitle">从 15 个开源记忆项目的系统性分析中，提炼底层共性设计原理与通用方法论</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-number">15</div>
+      <div class="hero-stat-label">完整源码项目</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-number">5</div>
+      <div class="hero-stat-label">认知成熟度层级</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-number">6</div>
+      <div class="hero-stat-label">底层设计原理</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-number">5</div>
+      <div class="hero-stat-label">组织拓扑范式</div>
+    </div>
+  </div>
+  <div class="scroll-indicator"></div>
+</header>
+
+<!-- Section 1: Meta Problem -->
+<main class="content">
+  <section class="section" id="meta">
+    <div class="section-header">
+      <span class="section-number">Part 01 — 元问题</span>
+      <h2 class="section-title">为什么需要记忆？</h2>
+      <p class="section-desc">所有项目的出发点都是同一个根本矛盾</p>
+    </div>
+
+    <div class="pull-quote">
+      <p>AI Agent 的上下文窗口是有限且易逝的，但人类期望它拥有跨会话、跨时间的持久认知能力。</p>
+    </div>
+
+    <div class="callout">
+      <strong>"更长的上下文窗口"不是答案</strong> — 即便窗口无限大，没有组织、没有遗忘、没有提炼的信息堆积，只是噪声的放大器，不是记忆。
+    </div>
+
+    <h3 style="font-family: var(--font-serif); margin: 3rem 0 1.5rem; font-size: 1.3rem;">五个第一性问题</h3>
+
+    <div class="questions-grid">
+      <div class="question-card">
+        <div class="question-icon">📝</div>
+        <div class="question-name">编码问题</div>
+        <div class="question-essence">原始交互如何变成结构化记忆？</div>
+        <div class="question-analogy">感知 → 工作记忆</div>
+      </div>
+      <div class="question-card">
+        <div class="question-icon">🕸️</div>
+        <div class="question-name">组织问题</div>
+        <div class="question-essence">记忆单元之间如何建立关系？</div>
+        <div class="question-analogy">语义网络 / 图式</div>
+      </div>
+      <div class="question-card">
+        <div class="question-icon">🔍</div>
+        <div class="question-name">检索问题</div>
+        <div class="question-essence">如何在正确的时刻召回正确的记忆？</div>
+        <div class="question-analogy">线索激活 / 联想</div>
+      </div>
+      <div class="question-card">
+        <div class="question-icon">🔄</div>
+        <div class="question-name">演化问题</div>
+        <div class="question-essence">记忆如何随时间更新、合并、遗忘？</div>
+        <div class="question-analogy">巩固 / 干扰 / 遗忘</div>
+      </div>
+      <div class="question-card">
+        <div class="question-icon">⚖️</div>
+        <div class="question-name">经济问题</div>
+        <div class="question-essence">如何在有限 token 预算下传递最大信息量？</div>
+        <div class="question-analogy">注意力分配 / 工作记忆容量</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2: Five Layer Model -->
+  <section class="section" id="model">
+    <div class="section-header">
+      <span class="section-number">Part 02 — 五层模型</span>
+      <h2 class="section-title">成长型系统的认知成熟度</h2>
+      <p class="section-desc">一个精确的评判框架，用于衡量记忆系统的"认知成熟度"</p>
+    </div>
+
+    <div class="layer-model">
+      <div class="layer-item">
+        <div class="layer-header">
+          <span class="layer-number">5</span>
+          <span class="layer-title">迁移与行为改变</span>
+        </div>
+        <div class="layer-desc">未来任务里，它真的开始表现出行为改变与知识迁移</div>
+        <div class="layer-coverage">覆盖率: 几乎空白 — 仅 MemOS 预留占位</div>
+      </div>
+      <div class="layer-item">
+        <div class="layer-header">
+          <span class="layer-number">4</span>
+          <span class="layer-title">治理</span>
+        </div>
+        <div class="layer-desc">哪些该保留？哪些该合并？哪些彼此冲突？哪些已过时？</div>
+        <div class="layer-coverage">覆盖率: 少数项目探索 — graphiti / openclaw / supermemory</div>
+      </div>
+      <div class="layer-item">
+        <div class="layer-header">
+          <span class="layer-number">3</span>
+          <span class="layer-title">提炼</span>
+        </div>
+        <div class="layer-desc">从原始经历里抽出更高层的经验、规律、偏好、失败模式 — 走到这一步，才接近"学习"</div>
+        <div class="layer-coverage">覆盖率: 部分项目触及 — m_flow / cognee / ClawXMemory / OpenViking</div>
+      </div>
+      <div class="layer-item">
+        <div class="layer-header">
+          <span class="layer-number">2</span>
+          <span class="layer-title">检索</span>
+        </div>
+        <div class="layer-desc">下一次能想起来。这很有用，但本质是 recall，不是 growth</div>
+        <div class="layer-coverage">覆盖率: 所有项目 — 投入工程量最多的层级</div>
+      </div>
+      <div class="layer-item">
+        <div class="layer-header">
+          <span class="layer-number">1</span>
+          <span class="layer-title">记录</span>
+        </div>
+        <div class="layer-desc">把事情留下来。这是地基，没有这层什么都别谈</div>
+        <div class="layer-coverage">覆盖率: 100% — 三条路线: LLM抽取 / 规则捕获 / 文件即记忆</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>核心洞察：</strong>大多数"记忆系统"止步于第 2 层（检索），少数触及第 3 层（提炼），极少数开始探索第 4 层（治理），而第 5 层（迁移）目前几乎是空白。
+    </div>
+
+    <!-- Project Mapping -->
+    <h3 style="font-family: var(--font-serif); margin: 4rem 0 1.5rem; font-size: 1.3rem;">15 个项目在五层模型中的定位</h3>
+
+    <div class="project-table-wrapper">
+      <table class="project-table">
+        <thead>
+          <tr>
+            <th>项目</th>
+            <th>L1 记录</th>
+            <th>L2 检索</th>
+            <th>L3 提炼</th>
+            <th>L4 治理</th>
+            <th>L5 迁移</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="project-name">mem0</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-half">◐</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">graphiti</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-full">●</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">cognee</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">m_flow</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">gbrain</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-half">◐</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">mempalace</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-half">◐</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">claude-mem</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-empty">○</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">codebuddy-mem</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-empty">○</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">ClawXMemory</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">openclaw</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-full">●</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">OpenViking</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-empty">○</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">memU</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">MemOS</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-half">◐</td></tr>
+          <tr><td class="project-name">supermemory</td><td class="dot-full">●</td><td class="dot-full">●</td><td class="dot-half">◐</td><td class="dot-full">●</td><td class="dot-empty">○</td></tr>
+          <tr><td class="project-name">ClaudeCode</td><td class="dot-full">●</td><td class="dot-empty">○</td><td class="dot-half">◐</td><td class="dot-half">◐</td><td class="dot-empty">○</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.8rem; font-family: var(--font-mono);">● 完整实现 &nbsp; ◐ 部分实现/初步探索 &nbsp; ○ 未涉及</p>
+  </section>
+
+  <!-- Section 3: Retrieval Paradigms -->
+  <section class="section" id="retrieval">
+    <div class="section-header">
+      <span class="section-number">Part 03 — 检索范式</span>
+      <h2 class="section-title">五种检索范式</h2>
+      <p class="section-desc">从纯向量近邻到 LLM 推理检索，认知深度逐级递增</p>
+    </div>
+
+    <div class="paradigm-cards">
+      <div class="paradigm-card">
+        <span class="paradigm-number">1</span>
+        <div class="paradigm-title">纯向量近邻</div>
+        <div class="paradigm-projects">mem0 · supermemory</div>
+        <div class="paradigm-desc">embedding → ANN → top-k，最简单直接的相似性检索</div>
+        <div class="paradigm-cognitive">认知对应：相似性联想（最浅层）</div>
+      </div>
+      <div class="paradigm-card">
+        <span class="paradigm-number">2</span>
+        <div class="paradigm-title">混合检索</div>
+        <div class="paradigm-projects">cognee · gbrain · mempalace · claude-mem</div>
+        <div class="paradigm-desc">向量 + FTS/BM25 + metadata 过滤，多信号融合</div>
+        <div class="paradigm-cognitive">认知对应：多线索并行激活</div>
+      </div>
+      <div class="paradigm-card">
+        <span class="paradigm-number">3</span>
+        <div class="paradigm-title">图路径传播</div>
+        <div class="paradigm-projects">m_flow · graphiti</div>
+        <div class="paradigm-desc">向量锚点 → 图遍历 → 路径成本评分，沿有意义的关系扩展</div>
+        <div class="paradigm-cognitive">认知对应：深层语义联想（最接近人类）</div>
+      </div>
+      <div class="paradigm-card">
+        <span class="paradigm-number">4</span>
+        <div class="paradigm-title">LLM 推理检索</div>
+        <div class="paradigm-projects">ClawXMemory · memU</div>
+        <div class="paradigm-desc">多跳 LLM + 充分性门控，模型逐跳推理判断</div>
+        <div class="paradigm-cognitive">认知对应：推理性回忆（最慢但最准）</div>
+      </div>
+      <div class="paradigm-card">
+        <span class="paradigm-number">5</span>
+        <div class="paradigm-title">级联渐进</div>
+        <div class="paradigm-projects">OpenViking · 蒸馏系统</div>
+        <div class="paradigm-desc">L0→L1→L2 逐层深入，先概要后细节</div>
+        <div class="paradigm-cognitive">认知对应：自然叙事模式</div>
+      </div>
+    </div>
+
+    <div class="principle-diagram" style="margin: 2rem 0; padding: 2rem; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-subtle);">所有检索都可抽象为三阶段：
+
+    候选生成（Recall） → 精排（Rank） → 预算裁剪（Budget）</div>
+
+    <!-- Similarity vs Relevance -->
+    <div class="vs-section">
+      <h3 style="font-family: var(--font-serif); font-size: 1.5rem; margin-bottom: 0.5rem;">核心反思：Similarity ≠ Relevance</h3>
+      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 2rem;">向量空间只编码了语义表面（"说了什么"），没有编码认知结构（"为什么重要、与什么相关、在什么条件下成立"）</p>
+
+      <div class="vs-grid">
+        <div class="vs-column">
+          <h4>Similarity（相似性）</h4>
+          <div class="vs-item">对称的：sim(A,B) = sim(B,A)</div>
+          <div class="vs-item">无语境的：与查询目的无关</div>
+          <div class="vs-item">只捕获"像"的关系</div>
+          <div class="vs-item">传递性不可靠</div>
+          <div class="vs-item">回答：这两段话说的是不是同一件事？</div>
+        </div>
+        <div class="vs-column">
+          <h4>Relevance（相关性）</h4>
+          <div class="vs-item">不对称的：rel(A→B) ≠ rel(B→A)</div>
+          <div class="vs-item">依赖语境：完全取决于"为什么问"</div>
+          <div class="vs-item">捕获因果、时序、对比、条件等</div>
+          <div class="vs-item">可沿有意义的路径传导</div>
+          <div class="vs-item">回答：在当前语境下，是否应该被想起来？</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Failure Scenarios -->
+    <h3 style="font-family: var(--font-serif); margin: 3rem 0 1.5rem; font-size: 1.3rem;">四个典型失败场景</h3>
+
+    <div class="scenario-cards">
+      <div class="scenario-card">
+        <div class="scenario-num">1</div>
+        <div>
+          <div class="scenario-title">因果关系 — "像"的不是"该想起来的"</div>
+          <div class="scenario-example">"为什么部署后 API 延迟从 50ms 飙到 2000ms？"</div>
+          <div class="scenario-comparison">
+            <div class="scenario-bad">
+              <div class="label">❌ 向量近邻</div>
+              <p style="margin-top:0.5rem;font-size:0.8rem">"API 延迟监控配置方法" — 语义最像但没回答"为什么"</p>
+            </div>
+            <div class="scenario-good">
+              <div class="label">✅ 图路径传播</div>
+              <p style="margin-top:0.5rem;font-size:0.8rem">"误删 Redis 连接池" → "重连风暴致 P99 飙升" — 因果链直接相关</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scenario-card">
+        <div class="scenario-num">2</div>
+        <div>
+          <div class="scenario-title">对比关系 — 最相关的恰恰是"最不像"的</div>
+          <div class="scenario-example">"React 和 Vue 在状态管理上有什么区别？"</div>
+          <div class="scenario-comparison">
+            <div class="scenario-bad">
+              <div class="label">❌ 向量近邻</div>
+              <p style="margin-top:0.5rem;font-size:0.8rem">只找到 React 状态管理文档 — 单边信息</p>
+            </div>
+            <div class="scenario-good">
+              <div class="label">✅ 图路径传播</div>
+              <p style="margin-top:0.5rem;font-size:0.8rem">useState → "对比方案"边 → Vue reactive() — 跨域连接</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scenario-card">
+        <div class="scenario-num">3</div>
+        <div>
+          <div class="scenario-title">时序关系 — "之前"和"之后"向量几乎相同</div>
+          <div class="scenario-example">"我们现在用的什么数据库版本？"<br>记忆中：3月"PostgreSQL 14" / 4月"已迁移到 PostgreSQL 16"</div>
+          <div class="scenario-comparison">
+            <div class="scenario-bad">
+              <div class="label">❌ 向量近邻</div>
+              <p style="margin-top:0.5rem;font-size:0.8rem">两条相似度几乎相同 — 无法区分哪条当前有效</p>
+            </div>
+            <div class="scenario-good">
+              <div class="label">✅ 时序图 (graphiti)</div>
+              <p style="margin-top:0.5rem;font-size:0.8rem">旧边 invalid_at=4月15日 — 时序感知，只返回有效边</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scenario-card">
+        <div class="scenario-num">4</div>
+        <div>
+          <div class="scenario-title">情景关联 — 一个联想唤起整段记忆</div>
+          <div class="scenario-example">"CORS 报错，但配置看起来没问题"<br>记忆中：一个月前处理过"看似 CORS 实际是证书过期"的排查</div>
+          <div class="scenario-comparison">
+            <div class="scenario-bad">
+              <div class="label">❌ 向量近邻</div>
+              <p style="margin-top:0.5rem;font-size:0.8rem">"CORS 配置教程" — 通用信息</p>
+            </div>
+            <div class="scenario-good">
+              <div class="label">✅ m_flow 锥形图</div>
+              <p style="margin-top:0.5rem;font-size:0.8rem">CORS → "误导性错误表现" → 完整排查 Episode — 联想链唤起</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4: Design Principles -->
+  <section class="section" id="principles">
+    <div class="section-header">
+      <span class="section-number">Part 04 — 设计原理</span>
+      <h2 class="section-title">六大底层共性原理</h2>
+      <p class="section-desc">从第一性原理出发，提炼 15 个项目的底层设计共性</p>
+    </div>
+
+    <div class="principles-grid">
+      <div class="principle-card" data-num="01">
+        <div class="principle-title">双轨存储</div>
+        <div class="principle-subtitle">Dual-Track Storage</div>
+        <div class="principle-body">
+          几乎所有项目都采用"向量 + 结构化"的双轨存储。向量捕获语义相似性（"像什么"），结构化捕获关系与约束（"是什么、与什么相关、何时有效"）。两者不可互相替代 — 与人类大脑中海马体（情景记忆）和新皮层（语义网络）的双系统同构。
+        </div>
+      </div>
+
+      <div class="principle-card" data-num="02">
+        <div class="principle-title">LLM 嵌入循环</div>
+        <div class="principle-subtitle">LLM-in-the-Loop</div>
+        <div class="principle-body">
+          LLM 不仅用于最终回答，还深度嵌入记忆的每个阶段：写入时（事实抽取）、检索时（策略选择、充分性判断）、演化时（冲突决策、知识整理）。LLM 充当"语义胶水"，在每个需要理解自然语言语义的环节提供判断能力。
+        </div>
+      </div>
+
+      <div class="principle-card" data-num="03">
+        <div class="principle-title">渐进式披露</div>
+        <div class="principle-subtitle">Progressive Disclosure</div>
+        <div class="principle-body">
+          所有成熟系统都实现了"先概要、后细节"。直接对应人类认知中的"注意力漏斗"。在 token 经济学下，渐进式披露是最优的信息传递策略：以最少的 token 传递最高的信息密度。
+        </div>
+        <div class="principle-diagram">L0 (~100 token)  →  L1 (~1-2k token)  →  L2 (原文)
+概要/精华          结构化经验          完整证据</div>
+      </div>
+
+      <div class="principle-card" data-num="04">
+        <div class="principle-title">溯源不可断</div>
+        <div class="principle-subtitle">Provenance Chain</div>
+        <div class="principle-body">
+          成熟的系统都维护从最终记忆到原始来源的可追溯链。没有溯源的知识是不可信的 — 与科学研究中"可重复性"、法律中"证据链"是同一原则：任何结论都必须能追溯到原始证据。
+        </div>
+      </div>
+
+      <div class="principle-card" data-num="05">
+        <div class="principle-title">事件驱动摄入</div>
+        <div class="principle-subtitle">Event-Driven Ingestion</div>
+        <div class="principle-body">
+          IDE 类记忆系统都采用 Hooks / 事件驱动的非侵入式数据采集。记忆的采集不应中断工作流 — 与操作系统中"中断驱动 I/O"的设计哲学一致：后台异步捕获，主线程不阻塞。
+        </div>
+      </div>
+
+      <div class="principle-card" data-num="06">
+        <div class="principle-title">统一生命周期</div>
+        <div class="principle-subtitle">Unified Lifecycle</div>
+        <div class="principle-body">
+          所有系统的记忆都遵循同一个状态机，与心理学中的 Atkinson-Shiffrin 记忆模型（感觉记忆 → 短时记忆 → 长时记忆）和遗忘曲线高度同构。
+        </div>
+      </div>
+    </div>
+
+    <!-- Lifecycle Diagram -->
+    <div class="lifecycle">
+      <div class="lifecycle-step">感知<br><small style="color:var(--text-muted)">Hooks/事件</small></div>
+      <span class="lifecycle-arrow">→</span>
+      <div class="lifecycle-step">编码<br><small style="color:var(--text-muted)">LLM抽取/规则</small></div>
+      <span class="lifecycle-arrow">→</span>
+      <div class="lifecycle-step">存储<br><small style="color:var(--text-muted)">双轨写入</small></div>
+      <span class="lifecycle-arrow">→</span>
+      <div class="lifecycle-step">巩固<br><small style="color:var(--text-muted)">Dreaming</small></div>
+      <span class="lifecycle-arrow">→</span>
+      <div class="lifecycle-step">检索<br><small style="color:var(--text-muted)">混合召回</small></div>
+      <span class="lifecycle-arrow">→</span>
+      <div class="lifecycle-step">衰退<br><small style="color:var(--text-muted)">时序失效</small></div>
+    </div>
+  </section>
+
+  <!-- Section 5: Topology -->
+  <section class="section" id="topology">
+    <div class="section-header">
+      <span class="section-number">Part 05 — 组织拓扑</span>
+      <h2 class="section-title">记忆的组织拓扑 — 五种范式</h2>
+      <p class="section-desc">15 个项目展现出五种不同的记忆组织方式</p>
+    </div>
+
+    <div class="topology-cards">
+      <div class="topology-card">
+        <div class="topology-icon">
+          <svg viewBox="0 0 64 64" fill="none">
+            <circle cx="20" cy="20" r="4" fill="#d4a853" opacity="0.6"/>
+            <circle cx="44" cy="20" r="4" fill="#d4a853" opacity="0.6"/>
+            <circle cx="32" cy="38" r="4" fill="#d4a853" opacity="0.6"/>
+            <circle cx="15" cy="48" r="4" fill="#d4a853" opacity="0.6"/>
+            <circle cx="50" cy="45" r="4" fill="#d4a853" opacity="0.6"/>
+            <circle cx="38" cy="55" r="4" fill="#d4a853" opacity="0.4"/>
+            <circle cx="28" cy="12" r="3" fill="#d4a853" opacity="0.4"/>
+          </svg>
+        </div>
+        <div class="topology-name">扁平向量空间</div>
+        <div class="topology-projects">mem0 · supermemory</div>
+        <div class="topology-desc">所有记忆嵌入同一空间，靠 metadata 过滤。简单快速，但丢失关系。</div>
+      </div>
+
+      <div class="topology-card">
+        <div class="topology-icon">
+          <svg viewBox="0 0 64 64" fill="none">
+            <polygon points="32,8 8,56 56,56" stroke="#d4a853" stroke-width="1.5" fill="none" opacity="0.4"/>
+            <line x1="20" y1="32" x2="44" y2="32" stroke="#d4a853" stroke-width="1" opacity="0.3"/>
+            <line x1="14" y1="44" x2="50" y2="44" stroke="#d4a853" stroke-width="1" opacity="0.3"/>
+            <circle cx="32" cy="8" r="3" fill="#4ecdc4"/>
+            <circle cx="20" cy="32" r="3" fill="#d4a853"/>
+            <circle cx="44" cy="32" r="3" fill="#d4a853"/>
+            <circle cx="14" cy="44" r="2.5" fill="#d4a853" opacity="0.6"/>
+            <circle cx="32" cy="44" r="2.5" fill="#d4a853" opacity="0.6"/>
+            <circle cx="50" cy="44" r="2.5" fill="#d4a853" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="topology-name">分层金字塔</div>
+        <div class="topology-projects">ClawXMemory · OpenViking · memU</div>
+        <div class="topology-desc">按信息密度/抽象级别分层，从顶层摘要到底层原文。模仿"概要→细节"认知模式。</div>
+      </div>
+
+      <div class="topology-card">
+        <div class="topology-icon">
+          <svg viewBox="0 0 64 64" fill="none">
+            <circle cx="32" cy="20" r="5" fill="#4ecdc4" opacity="0.7"/>
+            <circle cx="18" cy="40" r="4" fill="#5b8dee" opacity="0.7"/>
+            <circle cx="46" cy="38" r="4" fill="#9b7ed8" opacity="0.7"/>
+            <circle cx="32" cy="52" r="3.5" fill="#d4a853" opacity="0.7"/>
+            <line x1="32" y1="25" x2="18" y2="36" stroke="#e8e4dd" stroke-width="1" opacity="0.4"/>
+            <line x1="32" y1="25" x2="46" y2="34" stroke="#e8e4dd" stroke-width="1" opacity="0.4"/>
+            <line x1="18" y1="44" x2="32" y2="49" stroke="#e8e4dd" stroke-width="1" opacity="0.4"/>
+            <line x1="46" y1="42" x2="32" y2="49" stroke="#e8e4dd" stroke-width="1" opacity="0.4"/>
+            <line x1="18" y1="40" x2="46" y2="38" stroke="#e8e4dd" stroke-width="1" opacity="0.2" stroke-dasharray="3,2"/>
+          </svg>
+        </div>
+        <div class="topology-name">知识图谱</div>
+        <div class="topology-projects">graphiti · cognee · mempalace</div>
+        <div class="topology-desc">实体 + 关系 + 时序的图结构。共同抽象：Entity → Predicate → Entity + 时间戳。</div>
+      </div>
+
+      <div class="topology-card">
+        <div class="topology-icon">
+          <svg viewBox="0 0 64 64" fill="none">
+            <ellipse cx="32" cy="16" rx="20" ry="8" stroke="#d4a853" stroke-width="1.5" fill="none" opacity="0.6"/>
+            <ellipse cx="32" cy="30" rx="14" ry="6" stroke="#4ecdc4" stroke-width="1.5" fill="none" opacity="0.6"/>
+            <ellipse cx="32" cy="42" rx="9" ry="4" stroke="#5b8dee" stroke-width="1.5" fill="none" opacity="0.6"/>
+            <circle cx="32" cy="52" r="3" fill="#9b7ed8" opacity="0.8"/>
+            <line x1="32" y1="16" x2="32" y2="52" stroke="#e8e4dd" stroke-width="0.5" opacity="0.3" stroke-dasharray="2,2"/>
+          </svg>
+        </div>
+        <div class="topology-name">认知锥形</div>
+        <div class="topology-projects">m_flow</div>
+        <div class="topology-desc">四层锥形结构：Episode → Facet → FacetPoint → Entity。范式 2 与范式 3 的统一。</div>
+      </div>
+
+      <div class="topology-card">
+        <div class="topology-icon">
+          <svg viewBox="0 0 64 64" fill="none">
+            <rect x="8" y="8" width="48" height="48" rx="4" stroke="#d4a853" stroke-width="1" fill="none" opacity="0.3"/>
+            <rect x="12" y="12" width="18" height="18" rx="2" stroke="#4ecdc4" stroke-width="1" fill="rgba(78,205,196,0.1)"/>
+            <rect x="34" y="12" width="18" height="18" rx="2" stroke="#5b8dee" stroke-width="1" fill="rgba(91,141,238,0.1)"/>
+            <rect x="12" y="34" width="18" height="18" rx="2" stroke="#9b7ed8" stroke-width="1" fill="rgba(155,126,216,0.1)"/>
+            <rect x="34" y="34" width="18" height="18" rx="2" stroke="#d4a853" stroke-width="1" fill="rgba(212,168,83,0.1)"/>
+            <line x1="30" y1="21" x2="34" y2="21" stroke="#e8e4dd" stroke-width="1.5" opacity="0.5"/>
+            <line x1="21" y1="30" x2="21" y2="34" stroke="#e8e4dd" stroke-width="1.5" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="topology-name">空间隐喻</div>
+        <div class="topology-projects">mempalace · MemOS · OpenViking · gbrain</div>
+        <div class="topology-desc">用物理/虚拟空间概念组织：Wing/Room/Drawer、MemCube、viking://。本质是命名空间 + 层级 + 横向连接。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 6: Insights -->
+  <section class="section" id="insights">
+    <div class="section-header">
+      <span class="section-number">Part 06 — 行业洞察</span>
+      <h2 class="section-title">关键洞察与趋势</h2>
+    </div>
+
+    <!-- Generation Timeline -->
+    <h3 style="font-family: var(--font-serif); margin: 2rem 0 1.5rem; font-size: 1.2rem;">三代演化</h3>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-gen">第一代 — 向量存取</div>
+        <div class="timeline-title">向量存取 + LLM 抽取</div>
+        <div class="timeline-desc">第 1-2 层（记录+检索）</div>
+        <div class="timeline-projects">
+          <span class="timeline-tag">mem0</span>
+          <span class="timeline-tag">supermemory</span>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-gen">第二代 — 结构化增强</div>
+        <div class="timeline-title">向量 + 图/结构化 + 时序</div>
+        <div class="timeline-desc">第 1-3 层（+提炼），触及第 4 层（治理）</div>
+        <div class="timeline-projects">
+          <span class="timeline-tag">graphiti</span>
+          <span class="timeline-tag">cognee</span>
+          <span class="timeline-tag">mempalace</span>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-gen">第三代 — 认知引擎</div>
+        <div class="timeline-title">图作为评分引擎 + 认知锥形</div>
+        <div class="timeline-desc">第 1-3 层深度突破，第 4 层初步</div>
+        <div class="timeline-projects">
+          <span class="timeline-tag">m_flow</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Insights -->
+    <div class="insight-block">
+      <div class="insight-number">洞察 01</div>
+      <div class="insight-title">"联想 ≠ 搜索" 是最深刻的范式反思</div>
+      <div class="insight-body">
+        搜索给你"最像的片段"，联想给你"最该被想起来的那个情景"。图路径传播是目前最接近"联想"的工程实现，但计算成本和复杂度远高于纯向量方案。
+      </div>
+    </div>
+
+    <div class="insight-block">
+      <div class="insight-number">洞察 02</div>
+      <div class="insight-title">第 5 层是整个赛道的"无人区"</div>
+      <div class="insight-body">
+        当前所有系统都是"外挂式记忆" — 通过 prompt injection 注入。注入 ≠ 内化：每次都需显式检索+注入，模型本身没有"学会"。MemOS 是唯一在架构上为第 5 层预留了位置的项目（LoRA 参数记忆），但目前为纯占位符。
+      </div>
+    </div>
+
+    <div class="insight-block">
+      <div class="insight-number">洞察 03</div>
+      <div class="insight-title">IDE 记忆是最活跃的应用前线</div>
+      <div class="insight-body">
+        数据源天然结构化（工具调用、文件编辑）、反馈信号明确（编译/测试通过/失败）、用户感知直接（开发者立即感受到"Agent 是否记住了"）。claude-mem、codebuddy-mem、ClawXMemory 等构成最密集的创新区。
+      </div>
+    </div>
+
+    <!-- Trade-off Space -->
+    <h3 style="font-family: var(--font-serif); margin: 3rem 0 1.5rem; font-size: 1.2rem;">统一权衡空间</h3>
+    <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem;">所有技术选择都可定位到四维权衡空间中 — 没有一个项目能在所有维度同时最优</p>
+
+    <div class="tradeoff-grid">
+      <div class="tradeoff-item">
+        <div class="tradeoff-axis">
+          <span class="tradeoff-left">高压缩</span>
+          <span class="tradeoff-right">高保真</span>
+        </div>
+        <div class="tradeoff-bar"></div>
+        <div class="tradeoff-examples">
+          <span>mem0</span>
+          <span>m_flow / graphiti</span>
+        </div>
+      </div>
+      <div class="tradeoff-item">
+        <div class="tradeoff-axis">
+          <span class="tradeoff-left">低成本检索</span>
+          <span class="tradeoff-right">高质量检索</span>
+        </div>
+        <div class="tradeoff-bar"></div>
+        <div class="tradeoff-examples">
+          <span>supermemory</span>
+          <span>ClawXMemory</span>
+        </div>
+      </div>
+      <div class="tradeoff-item">
+        <div class="tradeoff-axis">
+          <span class="tradeoff-left">高自动化</span>
+          <span class="tradeoff-right">高可控性</span>
+        </div>
+        <div class="tradeoff-bar"></div>
+        <div class="tradeoff-examples">
+          <span>cognee / mem0</span>
+          <span>ClaudeCode / openclaw</span>
+        </div>
+      </div>
+      <div class="tradeoff-item">
+        <div class="tradeoff-axis">
+          <span class="tradeoff-left">通用引擎</span>
+          <span class="tradeoff-right">领域专用</span>
+        </div>
+        <div class="tradeoff-bar"></div>
+        <div class="tradeoff-examples">
+          <span>mem0 / cognee</span>
+          <span>claude-mem / codebuddy</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-logo">Memory Research</div>
+  <p class="footer-text">基于 memory-research 仓库中 15 个记忆项目的系统性分析<br>从第一性原理出发，提炼底层共性设计原理与通用方法论</p>
+  <p class="footer-text" style="margin-top: 1rem; opacity: 0.5;">2026 · 全量项目源码分析</p>
+</footer>
+
+<script>
+// Nav visibility on scroll
+const nav = document.getElementById('nav');
+let lastScroll = 0;
+
+window.addEventListener('scroll', () => {
+  const currentScroll = window.pageYOffset;
+  if (currentScroll > 300) {
+    nav.classList.add('visible');
+  } else {
+    nav.classList.remove('visible');
+  }
+  lastScroll = currentScroll;
+});
+
+// Section reveal on scroll
+const sections = document.querySelectorAll('.section');
+const observerOptions = {
+  threshold: 0.1,
+  rootMargin: '0px 0px -50px 0px'
+};
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, observerOptions);
+
+sections.forEach(section => observer.observe(section));
+
+// Smooth scroll for nav links
+document.querySelectorAll('.nav-links a').forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const target = document.querySelector(link.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+</body>
+</html>

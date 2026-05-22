@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MemOS Local Plugin：记录、召回与 Skill 成熟流程图</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f1e4;
+      --paper: #fffaf0;
+      --ink: #241b13;
+      --muted: #6f6255;
+      --line: #dfcfb6;
+      --line-strong: #b89b72;
+      --red: #9c3f2b;
+      --red-soft: #f4d7cc;
+      --green: #2f6b45;
+      --green-soft: #dbead7;
+      --blue: #2d5d88;
+      --blue-soft: #dce8f4;
+      --gold: #a56b10;
+      --gold-soft: #f7e3b4;
+      --purple: #6d4b93;
+      --purple-soft: #eadff4;
+      --shadow: 0 18px 50px rgba(75, 52, 24, 0.12);
+      --radius: 22px;
+      --sans: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      --mono: "Cascadia Code", Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(218, 154, 82, 0.28), transparent 28rem),
+        radial-gradient(circle at 88% 18%, rgba(67, 126, 96, 0.18), transparent 26rem),
+        linear-gradient(135deg, var(--bg), #f3ead8);
+      font-family: var(--sans);
+      line-height: 1.72;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(122, 92, 55, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(122, 92, 55, 0.07) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: linear-gradient(to bottom, #000, transparent 78%);
+    }
+
+    .page {
+      position: relative;
+      width: min(1220px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 36px 0 80px;
+    }
+
+    .hero,
+    .panel,
+    .node,
+    .table-wrap {
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 240, 0.88);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .hero {
+      padding: clamp(28px, 5vw, 62px);
+      border-radius: 32px;
+      overflow: hidden;
+    }
+
+    .kicker {
+      display: inline-flex;
+      padding: 8px 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: var(--red);
+      background: #fff6e7;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 12ch;
+      margin: 26px 0 18px;
+      font-size: clamp(44px, 8vw, 88px);
+      line-height: 0.92;
+      letter-spacing: -0.07em;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(28px, 4.4vw, 52px);
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .lead {
+      max-width: 920px;
+      color: var(--muted);
+      font-size: clamp(17px, 2vw, 22px);
+    }
+
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 22px 0 52px;
+    }
+
+    .toc a {
+      padding: 9px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      background: rgba(255, 250, 240, 0.76);
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    section {
+      margin-top: 70px;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 22px;
+      align-items: baseline;
+      margin-bottom: 24px;
+    }
+
+    .number {
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-12 { grid-column: span 12; }
+
+    .panel {
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+
+    .panel p + p {
+      margin-top: 12px;
+    }
+
+    .tag {
+      display: inline-flex;
+      width: fit-content;
+      padding: 4px 9px;
+      margin-bottom: 12px;
+      border-radius: 999px;
+      color: var(--red);
+      background: var(--red-soft);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    code {
+      padding: 0.12em 0.34em;
+      border-radius: 6px;
+      color: #6d321e;
+      background: #f2e2ca;
+      font-family: var(--mono);
+      font-size: 0.9em;
+    }
+
+    .flow {
+      display: grid;
+      gap: 16px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: minmax(190px, 0.35fr) 42px minmax(0, 1fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .node {
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .node b {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 17px;
+      letter-spacing: -0.01em;
+    }
+
+    .node p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .node.red { border-color: #d59a87; background: #fff4ef; }
+    .node.green { border-color: #a8c7aa; background: #f2faef; }
+    .node.blue { border-color: #a9c5df; background: #f1f7ff; }
+    .node.gold { border-color: #d5b46d; background: #fff7dc; }
+    .node.purple { border-color: #c4acd9; background: #faf3ff; }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: var(--line-strong);
+      font-size: 28px;
+      font-weight: 900;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .lane .node {
+      min-height: 190px;
+    }
+
+    .formula {
+      padding: 18px;
+      border: 1px solid var(--line-strong);
+      border-radius: 18px;
+      background: #fff6e6;
+      font-family: var(--mono);
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+
+    .callout {
+      padding: 18px;
+      border-left: 5px solid var(--red);
+      border-radius: 16px;
+      color: #4a2b1e;
+      background: #fff3e4;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--red);
+      background: #fbecd6;
+      font-size: 13px;
+      letter-spacing: 0.03em;
+    }
+
+    .table-wrap {
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .compact-list {
+      margin: 10px 0 0;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    .compact-list li + li {
+      margin-top: 6px;
+    }
+
+    .timeline {
+      position: relative;
+      display: grid;
+      gap: 14px;
+      padding-left: 28px;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 9px;
+      top: 10px;
+      bottom: 10px;
+      width: 3px;
+      border-radius: 999px;
+      background: linear-gradient(var(--red), var(--green), var(--blue), var(--purple));
+    }
+
+    .timeline .node {
+      position: relative;
+    }
+
+    .timeline .node::before {
+      content: "";
+      position: absolute;
+      left: -25px;
+      top: 20px;
+      width: 13px;
+      height: 13px;
+      border: 3px solid var(--paper);
+      border-radius: 999px;
+      background: var(--red);
+      box-shadow: 0 0 0 1px var(--line-strong);
+    }
+
+    .footer {
+      margin-top: 70px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 880px) {
+      .section-head,
+      .flow-row,
+      .lane {
+        grid-template-columns: 1fr;
+      }
+
+      .arrow {
+        transform: rotate(90deg);
+      }
+
+      .span-4,
+      .span-5,
+      .span-6,
+      .span-7,
+      .span-12 {
+        grid-column: 1 / -1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <span class="kicker">MemOS Local Plugin / Standalone Flowchart</span>
+      <h1>记录、召回与 Skill 成熟</h1>
+      <p class="lead">
+        这个文件单独解释 <code>memos-local-plugin</code> 的完整运转：执行数据如何被记录成 L1 trace，
+        如何通过评分标记“有用”，如何在 turn start 被召回，最后如何把共性经验升级成成熟 Skill。
+      </p>
+    </header>
+
+    <nav class="toc" aria-label="页面导航">
+      <a href="#overview">总览</a>
+      <a href="#recording">记录链路</a>
+      <a href="#scoring">评分机制</a>
+      <a href="#policy">Policy 成熟</a>
+      <a href="#skill">Skill 成熟</a>
+      <a href="#retrieval">召回链路</a>
+      <a href="#answer">人打分还是自动打分</a>
+    </nav>
+
+    <section id="overview">
+      <div class="section-head">
+        <span class="number">FLOW 01</span>
+        <h2>一张总图：从执行记录到未来召回</h2>
+      </div>
+      <div class="flow">
+        <div class="flow-row">
+          <div class="node red">
+            <b>Agent 执行</b>
+            <p>OpenClaw / Hermes 产生用户输入、assistant 输出、thinking、工具调用和工具结果。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node red">
+            <b>Adapter 标准化</b>
+            <p>OpenClaw 走进程内 TS hooks；Hermes 走 Python MemoryProvider + JSON-RPC bridge。最终都转成统一 DTO。</p>
+          </div>
+        </div>
+        <div class="flow-row">
+          <div class="node green">
+            <b>L1 Trace</b>
+            <p>记录每步事实：state、action、tool outcome、reflection、summary。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node green">
+            <b>评分回传</b>
+            <p>先评 reflection 质量 <code>alpha</code>，再评任务结果 <code>R_human</code>，最后回传每步 <code>value</code> 与 <code>priority</code>。</p>
+          </div>
+        </div>
+        <div class="flow-row">
+          <div class="node blue">
+            <b>L2 / L3 提炼</b>
+            <p>高价值重复 trace 归纳为 L2 policy；多个 policy 抽象出 L3 world model。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node blue">
+            <b>Skill 结晶</b>
+            <p>高 support、高 gain、可验证的 active policy 被包装为 candidate Skill，再通过试用和反馈晋升。</p>
+          </div>
+        </div>
+        <div class="flow-row">
+          <div class="node purple">
+            <b>下一轮 Turn Start</b>
+            <p>当前任务开始前，core 先检索记忆。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node purple">
+            <b>三层召回注入</b>
+            <p>Tier 1 Skill、Tier 2 Trace/Episode、Tier 3 World Model 被排序、过滤、渲染成 InjectionPacket 注入 prompt。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="recording">
+      <div class="section-head">
+        <span class="number">FLOW 02</span>
+        <h2>记录链路：插件如何拿到执行数据</h2>
+      </div>
+      <div class="grid">
+        <div class="panel span-6">
+          <span class="tag">OpenClaw</span>
+          <div class="timeline">
+            <div class="node red">
+              <b><code>before_prompt_build</code></b>
+              <p>任务开始前提取当前 turn，并调用 <code>core.onTurnStart()</code> 做召回。</p>
+            </div>
+            <div class="node red">
+              <b><code>before_tool_call</code> / <code>after_tool_call</code></b>
+              <p>记录工具名称、输入、输出、错误码、耗时和成功状态。</p>
+            </div>
+            <div class="node red">
+              <b><code>agent_end</code></b>
+              <p>收集 assistant 最终回复、thinking、工具调用序列，并调用 <code>core.onTurnEnd()</code>。</p>
+            </div>
+          </div>
+        </div>
+        <div class="panel span-6">
+          <span class="tag">Hermes</span>
+          <div class="timeline">
+            <div class="node red">
+              <b>Python <code>MemoryProvider</code></b>
+              <p>实现 Hermes 的记忆接口，作为 Python 侧适配层。</p>
+            </div>
+            <div class="node red">
+              <b><code>post_tool_call</code> / <code>post_llm_call</code></b>
+              <p>捕获工具执行结果和模型输出，累积成当前 turn 的证据。</p>
+            </div>
+            <div class="node red">
+              <b>JSON-RPC bridge</b>
+              <p>通过 <code>bridge.cts</code> 把 Python 事件发给 TypeScript <code>MemoryCore</code>。</p>
+            </div>
+          </div>
+        </div>
+        <div class="panel span-12">
+          <h3>进入 core 后统一成 L1 证据</h3>
+          <div class="lane">
+            <div class="node green">
+              <b><code>userText</code></b>
+              <p>用户请求、环境观察、上一轮上下文。</p>
+            </div>
+            <div class="node green">
+              <b><code>agentText</code></b>
+              <p>Agent 当步输出或最终回答。</p>
+            </div>
+            <div class="node green">
+              <b><code>agentThinking</code></b>
+              <p>Host 能提供时记录 native thinking，用于后续反思评分。</p>
+            </div>
+            <div class="node green">
+              <b><code>toolCalls</code></b>
+              <p>工具名、输入、输出、错误码，是判断执行成败的重要证据。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scoring">
+      <div class="section-head">
+        <span class="number">FLOW 03</span>
+        <h2>评分机制：哪些数据被标记为“有用”</h2>
+      </div>
+      <div class="grid">
+        <div class="panel span-5">
+          <h3>第一层：每步 reflection 的质量分 <code>alpha</code></h3>
+          <p>
+            Capture 的 reflect pass 会让 LLM 看完整 step 或完整 episode，对每步 reflection 打分。
+            <code>alpha</code> 衡量这条反思是否忠实、具体、有因果解释、能迁移。
+          </p>
+          <ul class="compact-list">
+            <li><code>alpha=0</code>：空洞、不可信、不可用。</li>
+            <li><code>alpha</code> 越高：后续回传越相信这一步的因果解释。</li>
+            <li>这不是用户满意度，而是 step 级证据质量。</li>
+          </ul>
+        </div>
+        <div class="panel span-7">
+          <h3>第二层：整个任务的 <code>R_human</code></h3>
+          <p>
+            Reward 模块用 task summary 加用户反馈打任务分。显式反馈越清楚，信号越强；
+            没有显式反馈时，LLM rubric 会保守估计目标完成度、过程质量和用户满意度。
+          </p>
+          <div class="formula">R_human = 0.45 * goal_achievement
+        + 0.30 * process_quality
+        + 0.25 * user_satisfaction</div>
+        </div>
+        <div class="panel span-12">
+          <h3>第三层：把任务分回传到每条 trace</h3>
+          <div class="formula">V_T = R_human
+V_t = alpha_t * R_human + (1 - alpha_t) * gamma * V_{t+1}
+priority = max(V_t, 0) * time_decay</div>
+          <p style="margin-top: 14px;">
+            这一步之后，每条 L1 trace 都不再只是历史记录，而有了 <code>value</code> 和
+            <code>priority</code>。高 priority 的正向 trace 更容易被召回；负价值 trace 不会被删除，
+            但更适合作为失败反例和 decision repair 输入。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="policy">
+      <div class="section-head">
+        <span class="number">FLOW 04</span>
+        <h2>从高价值 trace 到成熟 L2 Policy</h2>
+      </div>
+      <div class="flow">
+        <div class="flow-row">
+          <div class="node green">
+            <b>相似 trace 聚类</b>
+            <p>按 state/action、embedding、标签和工具等信号，把相似执行片段放入 candidate pool。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node green">
+            <b>L2 induction</b>
+            <p>LLM 用 <code>l2.induction</code> prompt 归纳“遇到 X，采用 Y，并注意 Z”的过程策略。</p>
+          </div>
+        </div>
+        <div class="flow-row">
+          <div class="node blue">
+            <b>计算 support</b>
+            <p>统计有多少 episode / trace 支持这个策略。样本不足时继续保持 candidate。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node blue">
+            <b>计算 gain</b>
+            <p>比较使用该策略的路径和未使用策略的基线，判断它是否真的带来收益。</p>
+          </div>
+        </div>
+        <div class="flow-row">
+          <div class="node gold">
+            <b>状态迁移</b>
+            <p><code>support >= minSupport</code> 且 <code>gain >= minGain</code> 时，policy 从 candidate 变 active。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node gold">
+            <b>归档条件</b>
+            <p>如果 active policy 后续 <code>gain < archiveGain</code> 或 support 归零，就归档，不再作为正向策略使用。</p>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top: 18px;">
+        <table>
+          <thead>
+            <tr>
+              <th>指标</th>
+              <th>它回答的问题</th>
+              <th>怎么来</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>support</code></td>
+              <td>这个策略是不是有足够证据支撑？</td>
+              <td>从源 episode / trace 计数而来。</td>
+            </tr>
+            <tr>
+              <td><code>gain</code></td>
+              <td>这个策略是不是比普通路径更有收益？</td>
+              <td><code>mean(V_with_policy) - blended_mean(V_without_policy)</code>。</td>
+            </tr>
+            <tr>
+              <td><code>status</code></td>
+              <td>这个策略当前能不能参与后续 Skill 结晶？</td>
+              <td>由 support、gain、archiveGain 等门槛决定。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="skill">
+      <div class="section-head">
+        <span class="number">FLOW 05</span>
+        <h2>从 active Policy 到成熟 Skill</h2>
+      </div>
+      <div class="grid">
+        <div class="panel span-12">
+          <div class="lane">
+            <div class="node purple">
+              <b>Eligibility</b>
+              <p>policy 必须是 active，且 <code>gain</code>、<code>support</code> 达标，并有正向 success anchor。</p>
+            </div>
+            <div class="node purple">
+              <b>Crystallize</b>
+              <p>LLM 用 <code>skill.crystallize</code> prompt 把 policy、evidence、counter examples 写成 Skill draft。</p>
+            </div>
+            <div class="node purple">
+              <b>Verify</b>
+              <p>确定性校验工具覆盖率和证据共振，防止 LLM 编造工具或写出脱离证据的 Skill。</p>
+            </div>
+            <div class="node purple">
+              <b>Candidate Skill</b>
+              <p>通过校验后仍先是 candidate，不会立刻作为成熟能力完全启用。</p>
+            </div>
+          </div>
+        </div>
+        <div class="panel span-6">
+          <h3>Skill 的可靠度 <code>eta</code></h3>
+          <p>
+            Skill 的成熟度不是只看 LLM 写得好不好，而是看后续试用表现和用户反馈。
+            <code>eta</code> 是技能可靠度，受 policy gain、trial pass/fail、用户正负反馈共同影响。
+          </p>
+        </div>
+        <div class="panel span-6">
+          <h3>候选到成熟的门槛</h3>
+          <p>
+            当 candidate Skill 的 <code>trialsAttempted >= candidateTrials</code>，并且
+            <code>eta >= minEtaForRetrieval</code>，才会晋升为 <code>active</code>。如果
+            <code>eta < archiveEta</code>，会被归档。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="retrieval">
+      <div class="section-head">
+        <span class="number">FLOW 06</span>
+        <h2>召回链路：有用经验如何回到下一次 prompt</h2>
+      </div>
+      <div class="flow">
+        <div class="flow-row">
+          <div class="node red">
+            <b>Turn Start</b>
+            <p>用户发起新任务，adapter 在 prompt build 前调用 <code>core.onTurnStart()</code>。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node red">
+            <b>构造检索查询</b>
+            <p>结合当前 user ask、workspace、namespace、工具上下文和历史状态。</p>
+          </div>
+        </div>
+        <div class="flow-row">
+          <div class="node purple">
+            <b>Tier 1：Skill</b>
+            <p>优先找 active Skill。命中时直接给使用时机、步骤、参数、preference 和 anti-pattern。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node blue">
+            <b>Tier 2：Trace / Episode</b>
+            <p>按相似度、关键词、priority 和时间衰减召回具体历史步骤，补细节和证据。</p>
+          </div>
+        </div>
+        <div class="flow-row">
+          <div class="node green">
+            <b>Tier 3：World Model</b>
+            <p>召回项目结构、环境约束、领域规律，不直接给动作，但减少重复探索。</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="node gold">
+            <b>InjectionPacket</b>
+            <p>把少量高价值记忆渲染成 prompt prelude，交给 Agent 作为当前任务上下文。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="answer">
+      <div class="section-head">
+        <span class="number">ANSWER</span>
+        <h2>到底是 human 打分，还是 agent 自动打分？</h2>
+      </div>
+      <div class="grid">
+        <div class="panel span-7">
+          <p class="lead">
+            准确答案是：混合评分。用户反馈是强信号，但系统不会要求用户每轮都手动打分。
+            没有用户反馈时，插件会用 LLM rubric、启发式规则和公式回传自动估计有用性。
+          </p>
+        </div>
+        <div class="panel span-5">
+          <div class="callout">
+            不是“LLM 觉得有用就变 Skill”，而是 evidence → score → policy gain → verifier → trial → eta 的多级门槛。
+          </div>
+        </div>
+        <div class="table-wrap span-12">
+          <table>
+            <thead>
+              <tr>
+                <th>信号</th>
+                <th>来源</th>
+                <th>人工还是自动</th>
+                <th>影响范围</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>alpha</code></td>
+                <td>LLM reflection judge</td>
+                <td>自动</td>
+                <td>决定 step 反思是否可信，影响价值回传。</td>
+              </tr>
+              <tr>
+                <td><code>R_human</code></td>
+                <td>用户反馈 + LLM rubric + heuristic fallback</td>
+                <td>混合</td>
+                <td>决定整个 episode 的任务成败信号。</td>
+              </tr>
+              <tr>
+                <td><code>value</code> / <code>priority</code></td>
+                <td>backprop 公式</td>
+                <td>自动</td>
+                <td>决定 trace 是否容易被未来召回。</td>
+              </tr>
+              <tr>
+                <td><code>support</code> / <code>gain</code></td>
+                <td>证据计数 + 对照价值计算</td>
+                <td>自动</td>
+                <td>决定 L2 policy 是否从 candidate 变 active。</td>
+              </tr>
+              <tr>
+                <td><code>eta</code></td>
+                <td>policy gain、trial 结果、用户正负反馈</td>
+                <td>混合</td>
+                <td>决定 Skill 是否晋升 active 或被 archived。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>
+        独立文件位置：<code>doc/memos-local-plugin/memos-local-plugin记录召回与Skill成熟流程图.html</code>。
+        内容基于本地源码 <code>MemOS/apps/memos-local-plugin</code> 的 capture、reward、memory/l2、memory/l3、skill、retrieval 与 adapter 实现整理。
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

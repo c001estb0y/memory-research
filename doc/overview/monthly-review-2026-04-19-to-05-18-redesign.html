@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>近一个月工作学习复盘｜2026.04.19 - 05.18</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --panel: #fffaf1;
+      --panel-2: #ebe1d1;
+      --ink: #231f1a;
+      --muted: #6f6559;
+      --faint: #a39584;
+      --line: rgba(35, 31, 26, 0.14);
+      --red: #a64235;
+      --green: #426b59;
+      --blue: #385f74;
+      --ochre: #ad7f2f;
+      --shadow: 0 18px 60px rgba(50, 36, 22, 0.13);
+      --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+      --sans: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif;
+      --mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background: #ded2bf;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.72;
+      background:
+        radial-gradient(circle at 12% 10%, rgba(166, 66, 53, 0.16), transparent 26rem),
+        radial-gradient(circle at 82% 5%, rgba(66, 107, 89, 0.14), transparent 24rem),
+        linear-gradient(135deg, #ddd0bc 0%, var(--bg) 36%, #e5d8c4 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(35, 31, 26, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(35, 31, 26, 0.028) 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.45;
+      mix-blend-mode: multiply;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      width: min(1240px, calc(100% - 32px));
+      margin: 32px auto;
+      border: 1px solid rgba(60, 43, 24, 0.18);
+      border-radius: 30px;
+      background:
+        linear-gradient(180deg, rgba(255, 250, 241, 0.94), rgba(244, 239, 230, 0.92)),
+        var(--bg);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 18px clamp(22px, 4vw, 54px);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .topbar span:last-child {
+      color: var(--red);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+      gap: clamp(28px, 5vw, 72px);
+      padding: clamp(36px, 6vw, 82px) clamp(22px, 5vw, 68px) clamp(28px, 5vw, 60px);
+      align-items: end;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--red);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 38px;
+      height: 1px;
+      background: var(--red);
+    }
+
+    h1, h2, h3 {
+      font-family: var(--serif);
+      margin: 0;
+      line-height: 1.12;
+    }
+
+    h1 {
+      max-width: 12ch;
+      font-size: clamp(3.1rem, 8vw, 7rem);
+      letter-spacing: -0.075em;
+    }
+
+    .hero-copy {
+      max-width: 46rem;
+      margin-top: 1.35rem;
+      color: var(--muted);
+      font-size: clamp(1.05rem, 1.55vw, 1.28rem);
+    }
+
+    .verdict-card {
+      border-radius: 26px;
+      background: #231f1a;
+      color: #fbf4e8;
+      padding: clamp(22px, 3vw, 34px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .verdict-card::before {
+      content: "";
+      position: absolute;
+      inset: -30% -20% auto auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: rgba(166, 66, 53, 0.32);
+      filter: blur(10px);
+    }
+
+    .grade {
+      position: relative;
+      display: flex;
+      align-items: baseline;
+      gap: 0.8rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .grade strong {
+      font-family: var(--mono);
+      font-size: clamp(3.5rem, 8vw, 6rem);
+      line-height: 0.9;
+      letter-spacing: -0.08em;
+      color: #f8d8b5;
+    }
+
+    .grade span {
+      color: rgba(251, 244, 232, 0.68);
+      font-size: 0.9rem;
+    }
+
+    .verdict-card p {
+      position: relative;
+      margin: 0;
+      color: rgba(251, 244, 232, 0.86);
+      font-size: 1rem;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: var(--line);
+    }
+
+    .metric {
+      background: rgba(255, 250, 241, 0.72);
+      padding: 22px clamp(18px, 3vw, 34px);
+      min-height: 118px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric b {
+      font-family: var(--mono);
+      font-size: clamp(2.1rem, 4vw, 3.55rem);
+      line-height: 1;
+      color: var(--red);
+      letter-spacing: -0.07em;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 13.5rem minmax(0, 1fr);
+      gap: clamp(26px, 4vw, 54px);
+      padding: clamp(28px, 5vw, 68px);
+    }
+
+    nav {
+      position: sticky;
+      top: 22px;
+      align-self: start;
+      border-left: 1px solid var(--line);
+      padding-left: 1rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    nav a {
+      display: block;
+      color: inherit;
+      text-decoration: none;
+      padding: 0.55rem 0;
+      border-bottom: 1px dashed rgba(35, 31, 26, 0.11);
+    }
+
+    nav a:hover {
+      color: var(--red);
+    }
+
+    .content {
+      display: grid;
+      gap: clamp(28px, 4vw, 52px);
+    }
+
+    section {
+      scroll-margin-top: 24px;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: 4rem minmax(0, 1fr);
+      gap: 1.2rem;
+      align-items: start;
+      margin-bottom: 1.25rem;
+    }
+
+    .section-no {
+      font-family: var(--mono);
+      color: var(--faint);
+      font-size: 0.8rem;
+      padding-top: 0.55rem;
+    }
+
+    h2 {
+      font-size: clamp(2rem, 4vw, 3.8rem);
+      letter-spacing: -0.055em;
+    }
+
+    .lead {
+      font-family: var(--serif);
+      font-size: clamp(1.18rem, 2vw, 1.58rem);
+      color: #33291f;
+      margin: 0 0 1.4rem;
+    }
+
+    p {
+      margin: 0.85rem 0;
+    }
+
+    .statement {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 11rem;
+      gap: clamp(18px, 3vw, 32px);
+      align-items: stretch;
+      border-radius: 28px;
+      background:
+        linear-gradient(135deg, rgba(166, 66, 53, 0.09), transparent 60%),
+        rgba(255, 250, 241, 0.7);
+      border: 1px solid var(--line);
+      padding: clamp(20px, 3vw, 34px);
+    }
+
+    .statement strong {
+      color: var(--red);
+    }
+
+    .stamp {
+      border: 1px solid rgba(166, 66, 53, 0.35);
+      border-radius: 50%;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--red);
+      font-family: var(--mono);
+      transform: rotate(-8deg);
+      background: rgba(255, 250, 241, 0.48);
+      align-self: center;
+      justify-self: center;
+      width: min(100%, 132px);
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      overflow: hidden;
+      background: rgba(255, 250, 241, 0.62);
+    }
+
+    .phase {
+      padding: 22px;
+      border-right: 1px solid var(--line);
+      min-height: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .phase:last-child {
+      border-right: 0;
+    }
+
+    .phase time {
+      font-family: var(--mono);
+      color: var(--faint);
+      font-size: 0.78rem;
+    }
+
+    .phase h3 {
+      font-size: 1.45rem;
+      color: var(--ink);
+      letter-spacing: -0.04em;
+    }
+
+    .phase p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.96rem;
+    }
+
+    .phase:nth-child(1) { border-top: 5px solid var(--green); }
+    .phase:nth-child(2) { border-top: 5px solid var(--ochre); }
+    .phase:nth-child(3) { border-top: 5px solid var(--red); }
+    .phase:nth-child(4) { border-top: 5px solid var(--blue); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: clamp(18px, 3vw, 28px);
+    }
+
+    .principle-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: clamp(14px, 2vw, 22px);
+      margin-top: 1.1rem;
+    }
+
+    .principle {
+      min-height: 210px;
+      padding: 20px;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 241, 0.66);
+    }
+
+    .principle .tag {
+      display: inline-flex;
+      margin-bottom: 0.9rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(166, 66, 53, 0.1);
+      color: var(--red);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .principle h3 {
+      font-size: 1.26rem;
+      color: var(--ink);
+      margin-bottom: 0.55rem;
+    }
+
+    .principle p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: clamp(20px, 3vw, 30px);
+      background: rgba(255, 250, 241, 0.68);
+    }
+
+    .card h3 {
+      font-size: 1.35rem;
+      color: var(--green);
+      margin-bottom: 0.8rem;
+    }
+
+    .card ul {
+      margin: 0;
+      padding-left: 1.15rem;
+    }
+
+    .card li {
+      margin: 0.55rem 0;
+      color: var(--muted);
+    }
+
+    .quote {
+      margin: 1.4rem 0 0;
+      padding: clamp(22px, 4vw, 38px);
+      border-radius: 26px;
+      background: var(--panel-2);
+      font-family: var(--serif);
+      font-size: clamp(1.25rem, 2.5vw, 2rem);
+      line-height: 1.48;
+      color: #3a2c21;
+    }
+
+    .quote mark {
+      background: linear-gradient(transparent 62%, rgba(173, 127, 47, 0.28) 62%);
+      color: inherit;
+      padding: 0 0.08em;
+    }
+
+    .scoreboard {
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      overflow: hidden;
+      background: rgba(255, 250, 241, 0.62);
+    }
+
+    .score-row {
+      display: grid;
+      grid-template-columns: 9rem minmax(0, 1fr) 3.5rem;
+      align-items: center;
+      gap: 1rem;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .score-row:last-child {
+      border-bottom: 0;
+    }
+
+    .score-row span {
+      color: var(--muted);
+    }
+
+    .bar {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(35, 31, 26, 0.12);
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--green), var(--ochre), var(--red));
+    }
+
+    .score-row b {
+      font-family: var(--mono);
+      color: var(--red);
+      text-align: right;
+    }
+
+    .list-block {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .item {
+      display: grid;
+      grid-template-columns: 10rem minmax(0, 1fr);
+      gap: 1.3rem;
+      padding: 18px 0;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .item:last-child {
+      border-bottom: 0;
+    }
+
+    .item h3 {
+      color: var(--red);
+      font-size: 1.12rem;
+      padding-top: 0.1rem;
+    }
+
+    .item p {
+      margin-top: 0;
+      color: var(--muted);
+    }
+
+    .action {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: clamp(18px, 3vw, 28px);
+      align-items: stretch;
+    }
+
+    .action .card:first-child {
+      background: #231f1a;
+      color: #fbf4e8;
+      border-color: #231f1a;
+    }
+
+    .action .card:first-child h3,
+    .action .card:first-child li {
+      color: #fbf4e8;
+    }
+
+    .action .card:first-child li {
+      color: rgba(251, 244, 232, 0.82);
+    }
+
+    footer {
+      padding: 26px clamp(22px, 5vw, 68px);
+      border-top: 1px solid var(--line);
+      color: var(--faint);
+      font-size: 0.86rem;
+    }
+
+    code {
+      font-family: var(--mono);
+      background: rgba(35, 31, 26, 0.08);
+      border-radius: 6px;
+      padding: 0.1rem 0.3rem;
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .layout,
+      .statement,
+      .action {
+        grid-template-columns: 1fr;
+      }
+
+      nav {
+        position: static;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.4rem;
+        border-left: 0;
+        padding-left: 0;
+      }
+
+      nav a {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0.45rem 0.75rem;
+        text-align: center;
+      }
+
+      .metrics,
+      .timeline,
+      .grid-2,
+      .principle-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .phase:nth-child(2) {
+        border-right: 0;
+      }
+
+      .phase:nth-child(1),
+      .phase:nth-child(2) {
+        border-bottom: 1px solid var(--line);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: 100%;
+        margin: 0;
+        border-radius: 0;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .metrics,
+      .timeline,
+      .grid-2,
+      .principle-grid,
+      nav {
+        grid-template-columns: 1fr;
+      }
+
+      .phase {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .phase:last-child {
+        border-bottom: 0;
+      }
+
+      .section-head,
+      .score-row,
+      .item {
+        grid-template-columns: 1fr;
+        gap: 0.45rem;
+      }
+
+      h1 {
+        font-size: clamp(3rem, 18vw, 4.7rem);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar">
+      <span>Monthly Review / Field Report</span>
+      <span>2026.04.19 - 2026.05.18</span>
+    </div>
+
+    <header class="hero">
+      <div>
+        <div class="eyebrow">Munger × Naval lens</div>
+        <h1>从复利与杠杆看这一个月</h1>
+        <p class="hero-copy">
+          这版不再只问“做了什么”，而是换一个更苛刻的视角：哪些积累会产生复利，哪些努力只是忙碌；哪些事情能放大你的专长，哪些只是消耗注意力。
+        </p>
+      </div>
+      <aside class="verdict-card" aria-label="综合评价">
+        <div class="grade"><strong>B+</strong><span>良好偏优秀</span></div>
+        <p>
+          芒格会肯定你的多元模型和纠错能力，也会提醒你别让待办债变成愚蠢成本。纳瓦尔会肯定你的代码、内容和 AI 自动化杠杆，也会追问：这些杠杆是否服务于一个长期游戏？
+        </p>
+      </aside>
+    </header>
+
+    <section class="metrics" aria-label="客观统计">
+      <div class="metric"><b>30</b><span>日记覆盖 30 天</span></div>
+      <div class="metric"><b>18±</b><span>有明确工程产出日</span></div>
+      <div class="metric"><b>10+</b><span>项目与学习线并行</span></div>
+      <div class="metric"><b>17</b><span>月末仍悬置待办</span></div>
+    </section>
+
+    <div class="layout">
+      <nav aria-label="章节导航">
+        <a href="#summary">先给结论</a>
+        <a href="#timeline">月度脉络</a>
+        <a href="#munger">芒格视角</a>
+        <a href="#naval">纳瓦尔视角</a>
+        <a href="#score">分项评分</a>
+        <a href="#next">下月建议</a>
+      </nav>
+
+      <div class="content">
+        <section id="summary">
+          <div class="section-head">
+            <div class="section-no">01</div>
+            <h2>先给结论</h2>
+          </div>
+          <div class="statement">
+            <div>
+              <p class="lead">
+                过去 30 天，你的核心变化不是“又做了很多事”，而是开始把经验沉淀成模型，把模型外化成文档，把文档和代码变成可复用杠杆。
+              </p>
+              <p>
+                从芒格看，你在建立跨学科模型和纠错系统；从纳瓦尔看，你在积累代码、内容、AI 流程三类杠杆。问题也清楚：如果没有少数长期游戏承接，这些复利会被并行任务稀释。
+              </p>
+            </div>
+            <div class="stamp">Compound<br />Leverage</div>
+          </div>
+        </section>
+
+        <section id="timeline">
+          <div class="section-head">
+            <div class="section-no">02</div>
+            <h2>月度脉络</h2>
+          </div>
+          <p class="lead">整个月不是平均用力，而是四段节奏：攻坚、切换、回归、收束。</p>
+          <div class="timeline">
+            <article class="phase">
+              <time>4/19 - 4/28</time>
+              <h3>记忆系统攻坚</h3>
+              <p>围绕个人/团队记忆系统密集推进，从数据迁移、桌面端发版到远端推送和多 Agent 场景落地。价值在于把研究压力压进真实工程问题里。</p>
+            </article>
+            <article class="phase">
+              <time>4/29 - 5/5</time>
+              <h3>旅行与低强度学习</h3>
+              <p>新疆旅行让电脑产出下降，但量化金融基础没有断。这个阶段的意义不是产出最大化，而是节奏切换和知识慢吸收。</p>
+            </article>
+            <article class="phase">
+              <time>5/6 - 5/15</time>
+              <h3>产品化回归</h3>
+              <p>回归后重点变成可展示、可部署、可被别人理解：机器人、展示页、桌面端配置、财务分析报表都进入更像产品的阶段。</p>
+            </article>
+            <article class="phase">
+              <time>5/16 - 5/18</time>
+              <h3>机制深挖</h3>
+              <p>周末整理 CAPM、RAG、读书笔记；工作日继续追问沙箱、依赖、上下文和视觉链路。学习开始从“知道概念”转向“理解边界”。</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="munger">
+          <div class="section-head">
+            <div class="section-no">03</div>
+            <h2>芒格视角：你在积累模型，也在制造注意力负债</h2>
+          </div>
+          <div class="quote">
+            芒格会喜欢你这个月的一点：你越来越少问“我感觉是不是这样”，而是反复追问：<mark>证据在哪里，反例在哪里，我哪里可能错了。</mark>
+          </div>
+          <div class="principle-grid">
+            <article class="principle">
+              <span class="tag">Mental models</span>
+              <h3>多元模型正在形成</h3>
+              <p>记忆系统、金融、会计、Agent、沙箱、RAG、CAPM 并不是散点。它们共同训练你理解系统、激励、风险、反馈和边界。</p>
+            </article>
+            <article class="principle">
+              <span class="tag">Inversion</span>
+              <h3>你开始懂得反过来想</h3>
+              <p>很多复盘不是“怎么成功”，而是“哪里会错”：图片为什么丢、日记为什么漏、配置为什么没生效。这是芒格式反愚蠢。</p>
+            </article>
+            <article class="principle">
+              <span class="tag">Circle of competence</span>
+              <h3>能力圈正在扩大，但边界要画清</h3>
+              <p>你能跨工程、AI、金融学习，但不能把“我有兴趣”误判成“我该投入”。能力圈扩大时，最重要的是知道哪些先不做。</p>
+            </article>
+          </div>
+          <div class="grid-2">
+            <article class="card">
+              <h3>芒格会给的正反馈</h3>
+              <ul>
+                <li>你在用日记建立反馈系统，而不是依赖记忆和情绪评价自己。</li>
+                <li>你越来越愿意承认误判：回滚、重写、改方案、补证据。</li>
+                <li>你把金融、会计、工程和 AI 放在同一个认知框架里，这是多元模型的雏形。</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>芒格会提醒的风险</h3>
+              <ul>
+                <li>待办债是认知负债，时间一长会让你误以为“记下来”就等于“推进了”。</li>
+                <li>并行项目太多时，最容易犯的错不是懒，而是低估切换成本。</li>
+                <li>如果没有验收标准，你会奖励“忙碌感”，而不是奖励真实进步。</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="naval">
+          <div class="section-head">
+            <div class="section-no">04</div>
+            <h2>纳瓦尔视角：你在积累杠杆，但还缺一个长期游戏</h2>
+          </div>
+          <p class="lead">
+            纳瓦尔会更关心：你的努力能不能脱离线性时间？这个月最有价值的，不是你花了多少小时，而是你把多少东西变成了代码、文档、自动化和可复制系统。
+          </p>
+          <div class="list-block">
+            <div class="item">
+              <h3>Specific knowledge</h3>
+              <p>你的专长不是泛泛“懂 AI”，而是 AI 记忆系统、Agent 工程、工具链接入、可观测性和知识外化。这些来自真实问题，不容易被课程复制。</p>
+            </div>
+            <div class="item">
+              <h3>Leverage</h3>
+              <p>你这个月使用了三类杠杆：代码杠杆（工具和系统）、内容杠杆（Obsidian 文档）、AI 杠杆（助手、机器人、自动化流程）。这是正确方向。</p>
+            </div>
+            <div class="item">
+              <h3>Long-term games</h3>
+              <p>最大问题是长期游戏还不够窄。memory-research、ShadowFolk、Agent Memory、金融 Agent 都相关，但需要一个主叙事，否则复利会分散。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="score">
+          <div class="section-head">
+            <div class="section-no">05</div>
+            <h2>分项评分</h2>
+          </div>
+          <p class="lead">这次评分按芒格和纳瓦尔的框架重排：看复利、反愚蠢、能力圈、杠杆和长期游戏，而不只是看工作量。</p>
+          <div class="scoreboard">
+            <div class="score-row"><span>复利资产</span><div class="bar"><div class="fill" style="width:86%"></div></div><b>8.6</b></div>
+            <div class="score-row"><span>反愚蠢能力</span><div class="bar"><div class="fill" style="width:90%"></div></div><b>9.0</b></div>
+            <div class="score-row"><span>能力圈建设</span><div class="bar"><div class="fill" style="width:82%"></div></div><b>8.2</b></div>
+            <div class="score-row"><span>杠杆使用</span><div class="bar"><div class="fill" style="width:84%"></div></div><b>8.4</b></div>
+            <div class="score-row"><span>长期游戏</span><div class="bar"><div class="fill" style="width:64%"></div></div><b>6.4</b></div>
+            <div class="score-row"><span>注意力纪律</span><div class="bar"><div class="fill" style="width:60%"></div></div><b>6.0</b></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <div class="section-no">06</div>
+          <h2>优点与不足：换成投资语言看自己</h2>
+          </div>
+          <div class="grid-2">
+            <article class="card">
+              <h3>优点</h3>
+              <ul>
+                <li><strong>复利资产在增加：</strong>文档、代码、日记、自动化流程都能在未来被重复调用。</li>
+                <li><strong>反愚蠢能力强：</strong>你常常能从“看似合理解释”退回证据链重查。</li>
+                <li><strong>专长有辨识度：</strong>AI 记忆系统 + Agent 工程 + 知识管理，是一组有稀缺性的交叉能力。</li>
+                <li><strong>杠杆意识变强：</strong>你不是只靠手工努力，而是在构建机器人、脚本、知识库和可复用页面。</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>不足</h3>
+              <ul>
+                <li><strong>注意力组合太分散：</strong>如果把任务当投资组合，你持仓太多，重仓不够。</li>
+                <li><strong>长期游戏叙事不够窄：</strong>很多方向相关，但还没有统一到一个清晰主战场。</li>
+                <li><strong>待办债是负复利：</strong>越不清理，越占用心理带宽，还会制造“我一直没做完”的噪音。</li>
+                <li><strong>部分学习仍停在输入：</strong>金融和模型基础要继续转成可演示模型、工具或决策模板。</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="next">
+          <div class="section-head">
+            <div class="section-no">07</div>
+          <h2>下个月：用复利和杠杆筛任务</h2>
+          </div>
+          <div class="action">
+            <article class="card">
+              <h3>核心动作</h3>
+              <ul>
+                <li><strong>芒格式清单：</strong>每个任务先问反面：如果它失败，最可能因为什么？如果没有清楚答案，先不做。</li>
+                <li><strong>纳瓦尔式筛选：</strong>优先做能变成代码、内容、数据、自动化的任务，因为它们能脱离你的单次时间投入。</li>
+                <li><strong>主线重仓：</strong>把“团队记忆 MVP”设为下月第一仓位，其他任务要么服务它，要么暂时退出。</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>一句话提醒</h3>
+              <p>
+                你这个月已经证明自己能学习、能排查、能交付。下个月要证明的是：你能把这些能力押到一个长期游戏上，让它产生复利，而不是继续被兴趣和待办牵着走。
+              </p>
+            </article>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <footer>
+      数据来源：<code>E:\Github\obsidian-notes\obsidian-notes\飞书笔记\日记</code> 中 2026-04-19 至 2026-05-18 的 30 篇日记。
+      本文件为重新创建的新版：<code>monthly-review-2026-04-19-to-05-18-redesign.html</code>。
+    </footer>
+  </main>
+</body>
+</html>

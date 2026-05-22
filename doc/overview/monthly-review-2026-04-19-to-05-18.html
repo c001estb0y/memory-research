@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>近一个月工作学习复盘｜2026.04.19 - 05.18</title>
+  <style>
+    :root {
+      --paper: #f7f0e3;
+      --paper-deep: #eadfc9;
+      --paper-soft: #fbf7ef;
+      --ink: #282018;
+      --ink-light: #665b50;
+      --ink-faint: #918376;
+      --red: #9f3a2e;
+      --green: #3f6756;
+      --gold: #a37b32;
+      --blue: #355f78;
+      --line: rgba(40, 32, 24, 0.14);
+      --shadow: 0 24px 70px rgba(64, 45, 25, 0.14);
+      --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", Georgia, serif;
+      --sans: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif;
+      --mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: #d9ceb8;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at 14% 4%, rgba(159, 58, 46, 0.13), transparent 28rem),
+        radial-gradient(circle at 86% 14%, rgba(63, 103, 86, 0.14), transparent 25rem),
+        linear-gradient(135deg, #d8ccb6 0%, #efe4cf 46%, #d3c2a6 100%);
+      line-height: 1.76;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.42;
+      background-image:
+        linear-gradient(rgba(80, 58, 31, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(80, 58, 31, 0.025) 1px, transparent 1px);
+      background-size: 22px 22px;
+      mix-blend-mode: multiply;
+    }
+
+    .book {
+      width: min(1180px, calc(100% - 32px));
+      margin: clamp(22px, 4vw, 56px) auto;
+      background:
+        linear-gradient(90deg, rgba(0, 0, 0, 0.035), transparent 5.6rem),
+        linear-gradient(180deg, var(--paper-soft), var(--paper) 42%, #f1e7d5);
+      border: 1px solid rgba(70, 50, 27, 0.2);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .book::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, transparent 0, rgba(55, 38, 18, 0.08) 5.2rem, transparent 5.8rem),
+        radial-gradient(ellipse at 20% 0%, rgba(255, 255, 255, 0.45), transparent 38rem);
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 17rem;
+      gap: clamp(28px, 4vw, 58px);
+      padding: clamp(28px, 6vw, 82px);
+    }
+
+    header {
+      grid-column: 1 / -1;
+      min-height: 62vh;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 16rem;
+      gap: clamp(24px, 4vw, 56px);
+      align-items: end;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: clamp(32px, 5vw, 66px);
+    }
+
+    .kicker {
+      font-family: var(--mono);
+      color: var(--red);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      margin-bottom: 1.2rem;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--serif);
+      font-weight: 700;
+      line-height: 1.15;
+      margin: 0;
+    }
+
+    h1 {
+      max-width: 13ch;
+      font-size: clamp(3.4rem, 10vw, 8.8rem);
+      letter-spacing: -0.08em;
+    }
+
+    .subtitle {
+      max-width: 42rem;
+      margin: 2rem 0 0;
+      color: var(--ink-light);
+      font-size: clamp(1.05rem, 1.6vw, 1.32rem);
+    }
+
+    .cover-note {
+      border-left: 1px solid var(--line);
+      padding-left: 1.3rem;
+      color: var(--ink-light);
+      font-family: var(--serif);
+      font-size: 1.04rem;
+    }
+
+    .cover-note strong {
+      display: block;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 2.6rem;
+      line-height: 1;
+      margin-bottom: 0.7rem;
+    }
+
+    .chapter {
+      grid-column: 1;
+      padding: clamp(34px, 5vw, 70px) 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .chapter:last-of-type { border-bottom: 0; }
+
+    .chapter-head {
+      display: grid;
+      grid-template-columns: 4.2rem minmax(0, 1fr);
+      gap: 1.2rem;
+      margin-bottom: 1.4rem;
+      align-items: start;
+    }
+
+    .num {
+      font-family: var(--mono);
+      color: var(--gold);
+      font-size: 0.82rem;
+      padding-top: 0.35rem;
+    }
+
+    h2 {
+      font-size: clamp(1.9rem, 3.8vw, 3.65rem);
+      letter-spacing: -0.04em;
+    }
+
+    h3 {
+      font-size: 1.18rem;
+      margin: 0 0 0.55rem;
+      color: var(--green);
+    }
+
+    p { margin: 0.85rem 0; }
+
+    .lead {
+      font-family: var(--serif);
+      font-size: clamp(1.18rem, 2vw, 1.58rem);
+      color: #372b20;
+      margin-top: 0;
+    }
+
+    .verdict {
+      margin: 2.3rem 0 0;
+      padding: clamp(18px, 3vw, 30px);
+      background:
+        linear-gradient(135deg, rgba(159, 58, 46, 0.08), transparent 55%),
+        rgba(255, 252, 245, 0.55);
+      border: 1px solid rgba(159, 58, 46, 0.18);
+      border-radius: 20px;
+      position: relative;
+    }
+
+    .verdict::before {
+      content: "总评";
+      position: absolute;
+      right: 1.2rem;
+      top: -0.82rem;
+      background: var(--red);
+      color: #fff8ed;
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin-top: 2rem;
+    }
+
+    .metric {
+      min-height: 8.5rem;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      background: rgba(255, 252, 245, 0.48);
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric b {
+      font-family: var(--mono);
+      font-size: clamp(1.75rem, 4vw, 3rem);
+      line-height: 1;
+      color: var(--red);
+      letter-spacing: -0.06em;
+    }
+
+    .metric span {
+      color: var(--ink-light);
+      font-size: 0.88rem;
+    }
+
+    .score-line {
+      display: grid;
+      gap: 0.8rem;
+      margin-top: 1.8rem;
+    }
+
+    .score-item {
+      display: grid;
+      grid-template-columns: 9rem minmax(0, 1fr) 3.2rem;
+      align-items: center;
+      gap: 1rem;
+      color: var(--ink-light);
+    }
+
+    .track {
+      height: 9px;
+      background: rgba(40, 32, 24, 0.11);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--green), var(--gold), var(--red));
+      transform-origin: left center;
+    }
+
+    .month-map {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1.8rem;
+    }
+
+    .period {
+      border-top: 3px solid var(--green);
+      padding-top: 0.95rem;
+    }
+
+    .period:nth-child(2) { border-color: var(--gold); }
+    .period:nth-child(3) { border-color: var(--red); }
+    .period:nth-child(4) { border-color: var(--blue); }
+
+    .period time {
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      margin-bottom: 0.35rem;
+    }
+
+    .period p {
+      color: var(--ink-light);
+      font-size: 0.95rem;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(18px, 3vw, 34px);
+      margin-top: 1.7rem;
+    }
+
+    .note-card {
+      padding: 1.25rem 1.35rem;
+      border-radius: 20px;
+      background: rgba(255, 252, 245, 0.48);
+      border: 1px solid var(--line);
+    }
+
+    .note-card ul {
+      margin: 0.65rem 0 0;
+      padding-left: 1.2rem;
+    }
+
+    .note-card li { margin: 0.45rem 0; }
+
+    .ink-list {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .ink-row {
+      display: grid;
+      grid-template-columns: 11rem minmax(0, 1fr);
+      gap: 1.2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .ink-row:last-child { border-bottom: 0; }
+
+    .ink-row strong {
+      color: var(--red);
+      font-family: var(--serif);
+    }
+
+    .ink-row p { margin-top: 0; color: var(--ink-light); }
+
+    aside {
+      grid-column: 2;
+      grid-row: 2 / span 6;
+      position: sticky;
+      top: 24px;
+      align-self: start;
+      padding-top: clamp(34px, 5vw, 70px);
+    }
+
+    .margin-note {
+      border-left: 1px solid var(--line);
+      padding-left: 1.1rem;
+      margin-bottom: 1.7rem;
+      color: var(--ink-light);
+      font-size: 0.92rem;
+    }
+
+    .margin-note .label {
+      display: block;
+      font-family: var(--mono);
+      color: var(--gold);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+    }
+
+    .quote {
+      font-family: var(--serif);
+      font-size: clamp(1.3rem, 2.6vw, 2.15rem);
+      line-height: 1.42;
+      margin: 1.8rem 0;
+      color: #38281d;
+    }
+
+    .quote mark {
+      background: linear-gradient(transparent 62%, rgba(163, 123, 50, 0.24) 62%);
+      color: inherit;
+      padding: 0 0.1em;
+    }
+
+    footer {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--line);
+      padding-top: 1.2rem;
+      color: var(--ink-faint);
+      font-size: 0.86rem;
+    }
+
+    code {
+      font-family: var(--mono);
+      background: rgba(40, 32, 24, 0.07);
+      border-radius: 0.35rem;
+      padding: 0.08rem 0.28rem;
+    }
+
+    a { color: var(--blue); }
+
+    @media (max-width: 980px) {
+      .page, header {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        position: static;
+        grid-column: 1;
+        grid-row: auto;
+        padding-top: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+
+      .metrics, .month-map {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .book {
+        width: 100%;
+        margin: 0;
+        border-radius: 0;
+      }
+
+      .page { padding: 24px; }
+      .two-col, aside, .metrics, .month-map { grid-template-columns: 1fr; }
+      .chapter-head, .ink-row, .score-item { grid-template-columns: 1fr; gap: 0.45rem; }
+      header { min-height: auto; }
+      h1 { font-size: clamp(3.2rem, 18vw, 5rem); }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .chapter, .metric, .period, .note-card, .margin-note {
+        animation: rise 0.7s cubic-bezier(.2, .8, .2, 1) both;
+      }
+
+      .metric:nth-child(2), .period:nth-child(2) { animation-delay: 0.06s; }
+      .metric:nth-child(3), .period:nth-child(3) { animation-delay: 0.12s; }
+      .metric:nth-child(4), .period:nth-child(4) { animation-delay: 0.18s; }
+
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(14px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="book">
+    <div class="page">
+      <header>
+        <div>
+          <div class="kicker">Monthly Field Notes · 2026.04.19 - 05.18</div>
+          <h1>一个月的生长纹理</h1>
+          <p class="subtitle">
+            这份复盘基于 30 篇日记，不按项目流水账展开，而是把近一个月的工作、学习、节奏和自我管理压缩成一份个人书页式 Overview。
+          </p>
+        </div>
+        <div class="cover-note">
+          <strong>B+</strong>
+          综合评价：良好偏优秀。不是因为每天都高产，而是因为你持续把经验转化为判断、文档和系统。
+        </div>
+      </header>
+
+      <section class="chapter">
+        <div class="chapter-head">
+          <div class="num">01</div>
+          <h2>先给结论</h2>
+        </div>
+        <p class="lead">
+          过去 30 天，你最明显的进步不是学了多少新概念，也不是同时推进了多少项目，而是从“追着问题跑”变成了“能把问题装进结构里”。
+        </p>
+        <div class="verdict">
+          <p>
+            客观上，你保持了完整日记覆盖，经历了两轮高强度工程周期、一次旅行切换、一段金融基础系统补课，以及多次日记纠错。主观上，我会把这个月评价为
+            <strong>“能力上台阶，但主线仍需收束”</strong>：你的工程判断、根因追踪和知识外化都在变强；但待办债、并行线过多、基础学习未清零，已经开始消耗你的注意力红利。
+          </p>
+        </div>
+
+        <div class="metrics" aria-label="客观统计">
+          <div class="metric"><b>30</b><span>日记文件，覆盖 30 天</span></div>
+          <div class="metric"><b>18±</b><span>有明确电脑/工程产出的天数</span></div>
+          <div class="metric"><b>10+</b><span>持续出现的项目与知识线</span></div>
+          <div class="metric"><b>17</b><span>月末仍悬置的主要待办</span></div>
+        </div>
+      </section>
+
+      <aside aria-label="页边批注">
+        <div class="margin-note">
+          <span class="label">Reader Note</span>
+          这份报告的读法：不要把它当成项目清单，而要看三件事：你在往哪里积累、哪里失控、下个月该砍掉什么。
+        </div>
+        <div class="margin-note">
+          <span class="label">Best Signal</span>
+          日记里最强的信号是反复出现的“根因纠偏”：不是模型能力问题、不是前端 bug、不是文件不存在，而是 prompt 槽位、状态链路、同步路径和证据缺口。
+        </div>
+        <div class="margin-note">
+          <span class="label">Main Risk</span>
+          最大风险不是偷懒，而是所有方向都值得做，结果每个方向都只推进到“下次再继续”。
+        </div>
+      </aside>
+
+      <section class="chapter">
+        <div class="chapter-head">
+          <div class="num">02</div>
+          <h2>这个月真正发生了什么</h2>
+        </div>
+        <p class="lead">
+          如果把 30 天折成四页，脉络很清楚：先冲刺、再旅行、再产品化回归，最后进入理论补课和机制深挖。
+        </p>
+
+        <div class="month-map">
+          <div class="period">
+            <time>4/19 - 4/28</time>
+            <h3>记忆系统攻坚</h3>
+            <p>多个项目同时推进，核心主题是“让记忆系统真的跑起来”。这阶段的价值在于把研究落到工程现实里。</p>
+          </div>
+          <div class="period">
+            <time>4/29 - 5/5</time>
+            <h3>旅行中的低强度学习</h3>
+            <p>新疆旅行让电脑产出下降，但金融基础学习没有断。节奏放缓反而让学习从工程焦虑里抽离出来。</p>
+          </div>
+          <div class="period">
+            <time>5/6 - 5/15</time>
+            <h3>产品化回归</h3>
+            <p>回归后不只是修功能，而是把机器人、展示页、桌面端和财务报表推向“可给别人看”的形态。</p>
+          </div>
+          <div class="period">
+            <time>5/16 - 5/18</time>
+            <h3>知识收束与机制追问</h3>
+            <p>周末整理量化金融、RAG、读书笔记；工作日继续追问沙箱、依赖、上下文和视觉链路。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter">
+        <div class="chapter-head">
+          <div class="num">03</div>
+          <h2>工作评价：强在闭环，弱在收束</h2>
+        </div>
+        <p class="quote">
+          你这个月最像一名成熟工程师的地方，是遇到问题时开始问：<mark>证据在哪里，链路断在哪，运行时现实是什么。</mark>
+        </p>
+        <div class="two-col">
+          <div class="note-card">
+            <h3>值得肯定</h3>
+            <ul>
+              <li>能把模糊问题拆成日志、数据库、transcript、配置和运行时状态来排查。</li>
+              <li>不只停在“调研一下”，而是经常落成文档、分支、版本、部署和可演示页面。</li>
+              <li>面对错误方案有推翻能力：回滚、改设计、承认误判，而不是硬把旧假设修到死。</li>
+              <li>开始形成自己的工程语言：保真 vs 压缩、命名不等于实现、状态一致性、证据链。</li>
+            </ul>
+          </div>
+          <div class="note-card">
+            <h3>需要警惕</h3>
+            <ul>
+              <li>并行线太多，容易把高能量消耗在频繁切换上，而不是形成少数代表性成果。</li>
+              <li>一些主线任务长期标记 doing，但缺少清晰验收标准，导致成就感被拖薄。</li>
+              <li>自动化日记和记录链路多次出错，说明你的“记忆系统研究”也需要反哺自己的流程。</li>
+              <li>产品化推进很快，但需要更早定义“谁会用、为什么用、用完看到什么结果”。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter">
+        <div class="chapter-head">
+          <div class="num">04</div>
+          <h2>学习评价：广度很好，但要防止变成收藏癖</h2>
+        </div>
+        <p class="lead">
+          这个月的学习很丰富：AI 记忆系统、Agent 工程、Transformer 基础、沙箱机制、金融市场、会计、CAPM、读书笔记都有推进。问题不在于学得少，而在于需要把“输入”进一步变成“可调用的能力”。
+        </p>
+
+        <div class="ink-list">
+          <div class="ink-row">
+            <strong>AI / 工程</strong>
+            <p>你已经从“看工具怎么用”走向“判断工具值不值得引入”。这是重要升级。ADK 调研后得出暂不需要、沙箱不等于 VM、Agent Eval 要看轨迹而不是只看结果，这些都说明你在建立判断框架。</p>
+          </div>
+          <div class="ink-row">
+            <strong>金融 / 量化</strong>
+            <p>学习路径从均值、方差、夏普、协方差、相关系数走到组合理论、有效前沿和 CAPM，路线是对的。更可贵的是你不断追问“公式在真实交易里怎么用”，没有停在背概念。</p>
+          </div>
+          <div class="ink-row">
+            <strong>方法论</strong>
+            <p>Nano 思维、认知-行动-反馈闭环、商业模式“不能吃独食”等笔记，说明你在抽象自己的做事方法。它们应当成为下月筛选任务的标准，而不是又多几篇好看的笔记。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter">
+        <div class="chapter-head">
+          <div class="num">05</div>
+          <h2>分项评分</h2>
+        </div>
+        <p class="lead">评分不是奖惩，而是定位。这个月的高分来自质量和复盘，扣分来自收尾与节奏。</p>
+        <div class="score-line">
+          <div class="score-item"><span>工程交付</span><div class="track"><div class="fill" style="width: 86%"></div></div><strong>8.6</strong></div>
+          <div class="score-item"><span>研究判断</span><div class="track"><div class="fill" style="width: 82%"></div></div><strong>8.2</strong></div>
+          <div class="score-item"><span>学习广度</span><div class="track"><div class="fill" style="width: 88%"></div></div><strong>8.8</strong></div>
+          <div class="score-item"><span>主线收束</span><div class="track"><div class="fill" style="width: 62%"></div></div><strong>6.2</strong></div>
+          <div class="score-item"><span>节奏管理</span><div class="track"><div class="fill" style="width: 66%"></div></div><strong>6.6</strong></div>
+          <div class="score-item"><span>复盘能力</span><div class="track"><div class="fill" style="width: 92%"></div></div><strong>9.2</strong></div>
+        </div>
+      </section>
+
+      <section class="chapter">
+        <div class="chapter-head">
+          <div class="num">06</div>
+          <h2>优点与不足</h2>
+        </div>
+        <div class="two-col">
+          <div class="note-card">
+            <h3>优点</h3>
+            <ul>
+              <li><strong>复盘密度高：</strong>30 天日记完整，且能修正错误记录，说明你重视事实底座。</li>
+              <li><strong>根因意识强：</strong>多次从“现象解释”回到“证据链定位”，这是高级工程习惯。</li>
+              <li><strong>学习能落地：</strong>金融课、会计、Agent、RAG 等内容多数都被写入 Obsidian，而不是停在聊天里。</li>
+              <li><strong>敢做取舍：</strong>能承认某些框架暂时不需要，也能推翻前一天方案。</li>
+            </ul>
+          </div>
+          <div class="note-card">
+            <h3>不足</h3>
+            <ul>
+              <li><strong>待办债过重：</strong>从 4 月中旬延续到月末的研究任务太多，容易形成心理噪音。</li>
+              <li><strong>主线验收不清：</strong>“团队记忆”是核心任务，但还缺一个明确的下月可验收版本。</li>
+              <li><strong>基础学习有拖延：</strong>Transformer、RLHF、GRPO、CAPM 等内容经常被推进，但也经常被挤压。</li>
+              <li><strong>记录流程不稳：</strong>日记、journal、session、待办文件之间仍有错读和漏读，需要被工程化约束。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter">
+        <div class="chapter-head">
+          <div class="num">07</div>
+          <h2>下个月只建议做三件事</h2>
+        </div>
+        <p class="lead">你不缺任务，也不缺兴趣；下个月真正需要的是减少入口，增加出口。</p>
+        <div class="ink-list">
+          <div class="ink-row">
+            <strong>一条主线</strong>
+            <p>把“团队记忆”定义成可演示 MVP：选一个真实仓库、固定一套采集链路、给出一次可复现召回/总结展示。不要再让它只是长期 doing。</p>
+          </div>
+          <div class="ink-row">
+            <strong>三项研究</strong>
+            <p>把 Mem0、MemFactory、openviking 合并成一个研究包，目标不是“都看完”，而是输出一页对比结论：哪些设计能进入你的系统，哪些不值得。</p>
+          </div>
+          <div class="ink-row">
+            <strong>一次清账</strong>
+            <p>专门拿半天处理旧待办：删除不再重要的、合并重复的、给剩下的写验收标准。待办列表不是仓库，不能无限扩容。</p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          数据来源：<code>E:\Github\obsidian-notes\obsidian-notes\飞书笔记\日记</code> 中 2026-04-19 至 2026-05-18 的 30 篇日记。
+          本页为重新设计版本，定位为个人月度复盘书页，而非项目流水账。
+        </p>
+      </footer>
+    </div>
+  </main>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>近一个月工作学习复盘 · 2026.04.19 — 05.18</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=Noto+Serif+SC:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f0e8;
+      --bg-card: #fffdf9;
+      --ink: #1c1916;
+      --ink-muted: #5c564e;
+      --accent: #c45c26;
+      --accent-soft: #f0d9c8;
+      --teal: #2a6f6a;
+      --teal-soft: #d4ebe8;
+      --gold: #9a7b2f;
+      --border: rgba(28, 25, 22, 0.1);
+      --shadow: 0 18px 50px rgba(28, 25, 22, 0.08);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: "DM Sans", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse 80% 50% at 10% -10%, rgba(196, 92, 38, 0.12), transparent 55%),
+        radial-gradient(ellipse 60% 40% at 95% 20%, rgba(42, 111, 106, 0.1), transparent 50%),
+        linear-gradient(180deg, #ebe4d8 0%, var(--bg) 120px);
+      line-height: 1.65;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      animation: fadeUp 0.7s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .eyebrow {
+      font-size: 0.78rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--teal);
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+    }
+
+    h1 {
+      font-family: "Noto Serif SC", serif;
+      font-size: clamp(1.85rem, 5vw, 2.65rem);
+      font-weight: 700;
+      line-height: 1.25;
+      margin: 0 0 0.75rem;
+    }
+
+    .subtitle {
+      color: var(--ink-muted);
+      font-size: 1.05rem;
+      max-width: 42em;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 1.25rem;
+    }
+
+    .pill {
+      font-size: 0.82rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+
+    .score-hero {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+      animation: fadeUp 0.7s 0.1s ease both;
+    }
+
+    @media (max-width: 720px) {
+      .score-hero { grid-template-columns: 1fr; }
+    }
+
+    .score-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .score-num {
+      font-family: "Noto Serif SC", serif;
+      font-size: 4rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .score-label {
+      font-size: 0.95rem;
+      color: var(--ink-muted);
+      margin-top: 0.5rem;
+    }
+
+    .verdict {
+      background: linear-gradient(135deg, #1c1916 0%, #3d3832 100%);
+      color: #f8f4ed;
+      border-radius: var(--radius);
+      padding: 1.5rem 1.75rem;
+      box-shadow: var(--shadow);
+    }
+
+    .verdict h2 {
+      font-family: "Noto Serif SC", serif;
+      font-size: 1.15rem;
+      margin: 0 0 0.75rem;
+      color: #f0d9c8;
+    }
+
+    .verdict p { margin: 0; font-size: 0.98rem; opacity: 0.92; }
+
+    section {
+      margin-bottom: 2.25rem;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    section:nth-child(3) { animation-delay: 0.05s; }
+    section:nth-child(4) { animation-delay: 0.1s; }
+    section:nth-child(5) { animation-delay: 0.15s; }
+
+    h2 {
+      font-family: "Noto Serif SC", serif;
+      font-size: 1.35rem;
+      margin: 0 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent-soft);
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin: 1.25rem 0 0.5rem;
+      color: var(--teal);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.85rem;
+    }
+
+    .stat {
+      text-align: center;
+      padding: 1rem 0.5rem;
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    .stat strong {
+      display: block;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 1.65rem;
+      color: var(--accent);
+    }
+
+    .stat span {
+      font-size: 0.82rem;
+      color: var(--ink-muted);
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 1.5rem;
+      border-left: 2px solid var(--accent-soft);
+    }
+
+    .timeline-item {
+      margin-bottom: 1.25rem;
+      position: relative;
+    }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -1.62rem;
+      top: 0.45rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--bg);
+    }
+
+    .timeline-date {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      color: var(--gold);
+      font-weight: 500;
+    }
+
+    ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+    li { margin-bottom: 0.35rem; }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      background: var(--teal-soft);
+      color: var(--teal);
+    }
+
+    .pro-con {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .pro-con { grid-template-columns: 1fr; }
+    }
+
+    .pro { border-top: 3px solid var(--teal); }
+    .con { border-top: 3px solid var(--accent); }
+
+    .pro h3 { color: var(--teal); }
+    .con h3 { color: var(--accent); }
+
+    .bar-chart { margin-top: 0.75rem; }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 7.5rem 1fr 2.5rem;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.55rem;
+      font-size: 0.88rem;
+    }
+
+    .bar-track {
+      height: 8px;
+      background: var(--accent-soft);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--teal), var(--accent));
+      border-radius: 4px;
+    }
+
+    .subjective {
+      background: linear-gradient(180deg, var(--bg-card), #faf6ef);
+      border-left: 4px solid var(--gold);
+      padding: 1rem 1.25rem;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin: 1rem 0;
+      font-style: italic;
+      color: #3d3832;
+    }
+
+    .subjective strong { font-style: normal; color: var(--ink); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.55rem 0.65rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+    }
+
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px dashed var(--border);
+      font-size: 0.82rem;
+      color: var(--ink-muted);
+    }
+
+    a { color: var(--teal); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">飞书笔记 · 日记复盘</div>
+      <h1>近一个月工作学习总结与评价</h1>
+      <p class="subtitle">
+        基于 <a href="https://github.com/c001estb0y/obsidian-notes/tree/main/%E9%A3%9E%E4%B9%A6%E7%AC%94%E8%AE%B0/%E6%97%A5%E8%AE%B0">obsidian-notes / 飞书笔记 / 日记</a>
+        共 30 篇（2026-04-19 至 2026-05-18），约 7.0 万字。评价力求<strong>客观数据</strong>与<strong>主观判断</strong>并重。
+      </p>
+      <div class="meta-row">
+        <span class="pill">统计周期：30 天</span>
+        <span class="pill">生成日期：2026-05-19</span>
+        <span class="pill">主线：AI 记忆系统 + 量化金融</span>
+      </div>
+    </header>
+
+    <div class="score-hero">
+      <div class="score-card">
+        <div class="score-num">B+</div>
+        <div class="score-label">综合评级 · 良好偏优秀</div>
+        <div class="score-label" style="margin-top:0.25rem;font-size:0.85rem;">量化得分约 <strong style="color:var(--ink)">7.8 / 10</strong></div>
+      </div>
+      <div class="verdict">
+        <h2>一句话总评</h2>
+        <p>
+          这一个月，你的核心变化不是“做了很多项目”，而是开始稳定地把复杂问题转化为可交付系统、可复用文档和可验证的判断。
+          最大优势是<strong>根因追踪、工程闭环和知识外化</strong>；主要短板是待办持续膨胀、主线收敛不足，以及假期后节奏恢复偏慢。
+          如果下个月能把研究清单压缩成少数可验收目标，综合表现有望从 B+ 提升到 A-。
+        </p>
+      </div>
+    </div>
+
+    <section>
+      <h2>一、客观画像</h2>
+      <div class="stat-grid">
+        <div class="stat"><strong>30</strong><span>日记篇数 / 30 天</span></div>
+        <div class="stat"><strong>100%</strong><span>日记覆盖率</span></div>
+        <div class="stat"><strong>~70k</strong><span>日记总字符</span></div>
+        <div class="stat"><strong>~18</strong><span>有明确电脑产出日</span></div>
+        <div class="stat"><strong>10+</strong><span>并行项目/仓库</span></div>
+        <div class="stat"><strong>14+</strong><span>待办项仍悬置（4/12 起）</span></div>
+      </div>
+
+      <h3>工作强度曲线（主观归一化）</h3>
+      <div class="card bar-chart">
+        <div class="bar-row"><span>4/20–4/28</span><div class="bar-track"><div class="bar-fill" style="width:95%"></div></div><span>峰值</span></div>
+        <div class="bar-row"><span>4/29–5/5</span><div class="bar-track"><div class="bar-fill" style="width:28%"></div></div><span>旅行</span></div>
+        <div class="bar-row"><span>5/6–5/15</span><div class="bar-track"><div class="bar-fill" style="width:88%"></div></div><span>回归高峰</span></div>
+        <div class="bar-row"><span>5/16–5/18</span><div class="bar-track"><div class="bar-fill" style="width:55%"></div></div><span>学习为主</span></div>
+      </div>
+
+      <h3>主题词频（日记正文统计，近似）</h3>
+      <div class="tag-row">
+        <span class="tag">记忆 / memory ×150+</span>
+        <span class="tag">Agent ×195</span>
+        <span class="tag">学习 ×79</span>
+        <span class="tag">ShadowFolk ×32</span>
+        <span class="tag">股票/量化 ×28+</span>
+        <span class="tag">sandbox ×21</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>二、工作主线回顾</h2>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-date">4/19 — 4/28 · 记忆生态攻坚周</div>
+          <p><strong>工程：</strong>围绕个人/团队记忆系统做了密集推进，既有数据迁移、桌面端发版、远端推送，也有多 Agent 协作场景落地。</p>
+          <p><strong>研究：</strong>从单点工具调研转向系统生态比较，开始关注“记忆如何接入宿主”“如何观测”“如何迁移与复用”。</p>
+          <div class="tag-row">
+            <span class="tag">agent-memory</span><span class="tag">shadow-folk</span><span class="tag">memory-research</span>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">4/26 · 周日 · 非电脑学习日</div>
+          <p>看完《大空头》；集中整理量化/会计/ Memory-Hive / OTel；日记显示当日无 journal，但 Obsidian 产出 7 篇——<strong>学习密度高、编码产出低</strong>的典型周末。</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">4/29 — 5/5 · 新疆旅行 + 移动学习</div>
+          <p>电脑 journal 基本空白，但通过飞书持续整理：均值→方差→夏普→协方差→相关系数；罗福莉访谈技术概念；新疆行程 checklist。5/3 读博尔赫斯《一枚钱币》——节奏切换健康。</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">5/6 — 5/15 · 回归后的产品化冲刺</div>
+          <p><strong>工程：</strong>回归后重点转向产品化：机器人、知识架构页、桌面端配置体验、财务分析报表和展示页都进入“可给别人看”的阶段。</p>
+          <p><strong>研究：</strong>研究主题更偏工程判断：框架是否值得引入、评估如何落地、沙箱边界是什么、记忆系统如何避免概念大于实现。</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-date">5/16 — 5/18 · 理论补课 + 机制深挖</div>
+          <p>周末以 Obsidian 整理为主：CAPM 完整链路、RAG chunk 粒度、微信读书 9 本笔记导出；工作日 shadow-folk Pak 依赖机制、hermes 上下文/视觉修复。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>三、学习主线回顾</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="margin-top:0;color:var(--ink)">AI / 工程</h3>
+          <ul>
+            <li>记忆系统：接入范式（MCP vs 宿主插件）、保真 vs 压缩、异步时序错配</li>
+            <li>Agent：Harness101、MCP 生产实践、LangGraph、Eval 三层框架</li>
+            <li>模型基础：nano-GPT 可视化、Q/K/V、KV cache、LoRA、DeepSeek 词表流转</li>
+            <li>沙箱与安全：Claude Code 沙箱源码、microVM 定位澄清</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;color:var(--ink)">金融 / 量化</h3>
+          <ul>
+            <li>Yale Financial Markets 系统课：L2–L4 + CAPM 收尾中</li>
+            <li>工具链：赔率/胜率、凯利、组合理论、ETF、Swap、ROE 杜邦</li>
+            <li>实务：腾讯财报研读、financetoolkit、trader韭 笔记、USDT/EMH</li>
+            <li>生活金融：微众资产穿透分析、地产减值与资产负债表</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1rem">
+        <h3 style="margin-top:0;color:var(--ink)">交叉能力 · 摄影 / 方法论</h3>
+        <p>ComfyUI HASU 调色、白平衡与直方图；Nano 思维、认知-行动-反馈闭环；商业模式「不能吃独食」心得。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>四、分项评分（主客观结合）</h2>
+      <table>
+        <thead>
+          <tr><th>维度</th><th>分数</th><th>客观依据</th><th>主观判断</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>工程交付</td><td>8.5</td>
+            <td>多条产品线出现可运行、可部署、可演示的阶段性成果</td>
+            <td>能闭环、能发版、能写设计文档；遇到复杂问题时开始更愿意回到证据和基线</td>
+          </tr>
+          <tr>
+            <td>研究深度</td><td>8.0</td>
+            <td>memory-research 文档持续增量；多篇论文、竞品、框架对比笔记</td>
+            <td>已从「存什么」升级到「怎么接入宿主」「如何可观测」——框架感明显</td>
+          </tr>
+          <tr>
+            <td>学习广度</td><td>8.5</td>
+            <td>假期仍输出量化笔记；CAPM 链路与 AI 笔记并行</td>
+            <td>广度是优势，但也带来<strong>注意力碎片化</strong></td>
+          </tr>
+          <tr>
+            <td>任务收尾</td><td>6.5</td>
+            <td>14+ 待办自 4/12 未清空；Mem0/Cognee/MemFactory 等多为「排队」</td>
+            <td>研究型待办需要 OKR 化，否则永远「doing」</td>
+          </tr>
+          <tr>
+            <td>节奏与恢复</td><td>6.0</td>
+            <td>4/29–5/5 低产出；5/16–17 journal 缺失但学习继续</td>
+            <td>旅行学习模式可行，但回来后 5/4–5/5 连续两天无互动，恢复偏慢</td>
+          </tr>
+          <tr>
+            <td>元认知 / 复盘</td><td>9.0</td>
+            <td>30 天全勤日记；多次记录「命名≠实现」「先 git pull」等教训</td>
+            <td>复盘质量在同类开发者中属上乘；cron 漏记需工程化兜底</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>五、优点与不足</h2>
+      <div class="pro-con">
+        <div class="card pro">
+          <h3>优点</h3>
+          <ul>
+            <li><strong>日记纪律极强</strong>：30 天无断更，且会主动纠正错误日记（5/13、5/16 修正），元数据可信度高。</li>
+            <li><strong>根因思维稳定输出</strong>：图片不进摘要（prompt 槽位 / 转录解析 / 时序）、托盘闪烁（预热+焦点）、发灰调色（LAB 缩放）等案例反复验证。</li>
+            <li><strong>多项目并行仍能交付</strong>：峰值周上下文切换很重，但仍保持了版本推进、部署验证与文档沉淀。</li>
+            <li><strong>知识外化能力强</strong>：Obsidian + Git 形成第二大脑；金融与 AI 双线笔记互相引用（双链、等式验证）。</li>
+            <li><strong>敢于推翻昨日方案</strong>：shadow-folk 队列→写入即触发、ADK 调研后明确「不需要」——决策成熟度高。</li>
+            <li><strong>跨界整合</strong>：交易笔记、财报工具、Agent 记忆、飞书机器人形成真实业务拼图。</li>
+          </ul>
+          <div class="subjective">
+            <strong>主观感受：</strong>这一个月最珍贵的不是写了多少代码，而是你已经稳定地在用「证据链」说话——文档、日志、数据库、transcript 交叉验证，这是 Senior 工程师的思维习惯。
+          </div>
+        </div>
+        <div class="card con">
+          <h3>不足</h3>
+          <ul>
+            <li><strong>待办债严重</strong>：4/12 主线「团队记忆」及十余项研究清单整月悬置，完成率低，心理负担被日记反复提及。</li>
+            <li><strong>基础课进度滞后</strong>：Transformer / RLHF 在待办中挂了一个月，虽 4/28 标记 BlockSize 完成，但整体「学习债」未系统清零。</li>
+            <li><strong>工作日志与日记偶发脱节</strong>：旅行期、周末多次「未检索到 journal」，导致电脑产出被低估；依赖事后补写。</li>
+            <li><strong>自动化流程不可靠</strong>：cron 日记超时、路径方括号 glob、漏读 session——工具链需加固。</li>
+            <li><strong>并行线过多</strong>：同一周同时推进多个产品、研究和学习方向，上下文切换成本高，长期会稀释主线成果。</li>
+            <li><strong>恢复窗口利用不足</strong>：假期后 5/4–5/5 几乎空白，若提前规划「返程后首日三件事」可更快回血。</li>
+          </ul>
+          <div class="subjective">
+            <strong>主观感受：</strong>你现在的瓶颈不是「不够努力」，而是<strong>没有把努力收敛成可验收的少数结果</strong>。研究型待办越积越多，会反过来稀释主线 memory-research 的成就感。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>六、下月建议（可执行）</h2>
+      <div class="card">
+        <ol>
+          <li><strong>待办瘦身</strong>：把 14 项研究待办合并为 3 条季度目标（建议：MemFactory 精读 + Mem0 token 策略 + openviking 榜单复现）。</li>
+          <li><strong>主线验收</strong>：为 memory-research 定义「团队记忆 MVP」——例如 1 个仓库 + 1 套 Hook + 1 份可演示召回率。</li>
+          <li><strong>巩固 5/18 成果</strong>：沙箱文档、分钟级回测待办与 CAPM 笔记串成「安全 + 数据 + 理论」三角。</li>
+          <li><strong>日记工程化</strong>：journal 与 Obsidian 写入同一 CI 检查（文件存在 + git push），避免「说了要写但没写」。 </li>
+          <li><strong>节奏</strong>：高强度周之后预留 0.5 天「只收尾不开新坑」——你已在 4/24 证明回滚比硬扛更有效。</li>
+        </ol>
+      </div>
+    </section>
+
+    <footer>
+      <p>数据来源：本地克隆仓库 <code>d:\GitHub\obsidian-notes\飞书笔记\日记\</code>（2026-04-19 至 2026-05-18，共 30 文件）。评价由 AI 根据日记全文归纳，主观段落已标注。</p>
+      <p>若需更新至 5/19 当日日记，重新生成即可。</p>
+    </footer>
+  </div>
+
+  <script>
+    // 轻量入场动画（无外部依赖）
+    document.querySelectorAll('.stat, .card, .timeline-item').forEach((el, i) => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(10px)';
+      el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+      el.style.transitionDelay = `${Math.min(i * 0.03, 0.4)}s`;
+      requestAnimationFrame(() => {
+        const obs = new IntersectionObserver((entries) => {
+          entries.forEach(e => {
+            if (e.isIntersecting) {
+              e.target.style.opacity = '1';
+              e.target.style.transform = 'translateY(0)';
+            }
+          });
+        }, { threshold: 0.1 });
+        obs.observe(el);
+      });
+    });
+  </script>
+</body>
+</html>

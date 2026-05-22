@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MemOS Local Plugin 使用流程导览</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: oklch(20% 0.035 70);
+      --muted: oklch(46% 0.035 72);
+      --paper: oklch(97% 0.025 82);
+      --paper-deep: oklch(92% 0.035 82);
+      --line: oklch(82% 0.045 82);
+      --brick: oklch(51% 0.16 37);
+      --moss: oklch(43% 0.11 145);
+      --ochre: oklch(70% 0.13 82);
+      --blueprint: oklch(36% 0.09 248);
+      --panel: oklch(99% 0.012 82 / 0.92);
+      --shadow: 0 24px 80px oklch(32% 0.05 70 / 0.16);
+      --radius: 28px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 14% 9%, oklch(84% 0.12 80 / 0.48), transparent 28rem),
+        radial-gradient(circle at 88% 18%, oklch(80% 0.08 145 / 0.34), transparent 24rem),
+        linear-gradient(135deg, var(--paper), oklch(95% 0.028 95));
+      font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(oklch(50% 0.03 80 / 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, oklch(50% 0.03 80 / 0.08) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, black, transparent 78%);
+    }
+
+    a {
+      color: var(--blueprint);
+      text-underline-offset: 0.18em;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 34px 0 72px;
+    }
+
+    .hero {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.72fr);
+      gap: clamp(24px, 5vw, 72px);
+      align-items: end;
+      min-height: 520px;
+      padding: clamp(28px, 5vw, 68px);
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 10px);
+      background:
+        linear-gradient(120deg, oklch(99% 0.015 86 / 0.9), oklch(94% 0.035 82 / 0.78)),
+        var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "L1 / L2 / L3 / Skill";
+      position: absolute;
+      right: -3ch;
+      top: 44px;
+      color: oklch(62% 0.08 65 / 0.14);
+      font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+      font-size: clamp(58px, 12vw, 160px);
+      letter-spacing: -0.08em;
+      line-height: 0.8;
+      transform: rotate(-3deg);
+      white-space: nowrap;
+    }
+
+    .kicker {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      width: fit-content;
+      padding: 8px 12px;
+      border: 1px solid oklch(67% 0.08 72);
+      border-radius: 999px;
+      color: var(--brick);
+      background: oklch(98% 0.03 85 / 0.84);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 11ch;
+      margin: 30px 0 22px;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: clamp(52px, 9vw, 116px);
+      line-height: 0.88;
+      letter-spacing: -0.075em;
+    }
+
+    .hero p {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(18px, 2vw, 24px);
+    }
+
+    .hero-card {
+      position: relative;
+      z-index: 1;
+      padding: 24px;
+      border: 1px solid oklch(75% 0.05 82);
+      border-radius: 24px;
+      background: oklch(97% 0.02 84 / 0.8);
+      backdrop-filter: blur(10px);
+    }
+
+    .hero-card strong {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--blueprint);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero-card code,
+    code {
+      padding: 0.12em 0.36em;
+      border-radius: 6px;
+      background: oklch(90% 0.035 82);
+      color: oklch(30% 0.08 38);
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.9em;
+    }
+
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 22px 0 50px;
+    }
+
+    .toc a {
+      padding: 9px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: oklch(98% 0.018 84 / 0.72);
+      color: var(--ink);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      font-weight: 650;
+      text-decoration: none;
+      transition: transform 180ms ease, background 180ms ease;
+    }
+
+    .toc a:hover {
+      transform: translateY(-2px);
+      background: oklch(95% 0.035 82);
+    }
+
+    section {
+      margin-top: clamp(42px, 8vw, 92px);
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: 110px minmax(0, 1fr);
+      gap: 24px;
+      align-items: baseline;
+      margin-bottom: 22px;
+    }
+
+    .number {
+      color: var(--brick);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+    }
+
+    h2 {
+      margin: 0;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: clamp(30px, 4.6vw, 58px);
+      line-height: 1;
+      letter-spacing: -0.055em;
+    }
+
+    h3 {
+      margin: 30px 0 10px;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: 0 14px 42px oklch(32% 0.04 70 / 0.08);
+    }
+
+    .panel.pad {
+      padding: clamp(22px, 3vw, 34px);
+    }
+
+    .span-7 { grid-column: span 7; }
+    .span-6 { grid-column: span 6; }
+    .span-5 { grid-column: span 5; }
+    .span-4 { grid-column: span 4; }
+    .span-12 { grid-column: 1 / -1; }
+
+    .lead {
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    .relation {
+      position: relative;
+      padding: 28px;
+      overflow: hidden;
+    }
+
+    .relation .node {
+      padding: 18px 20px;
+      border: 1px solid oklch(73% 0.07 82);
+      border-radius: 18px;
+      background: oklch(98% 0.018 84);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-weight: 750;
+    }
+
+    .relation .sub {
+      margin-top: 10px;
+      color: var(--muted);
+      font-family: ui-serif, Georgia, serif;
+      font-weight: 400;
+    }
+
+    .arrow {
+      margin: 10px 0;
+      color: var(--brick);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-weight: 900;
+    }
+
+    .flow {
+      display: grid;
+      gap: 12px;
+      counter-reset: step;
+    }
+
+    .step {
+      position: relative;
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+      padding: 18px;
+      border: 1px solid oklch(78% 0.045 82);
+      border-radius: 18px;
+      background: oklch(98% 0.015 84 / 0.8);
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step, decimal-leading-zero);
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .step b {
+      display: block;
+      margin-bottom: 4px;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 18px;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .codeblock {
+      overflow: auto;
+      padding: 20px;
+      border-radius: 22px;
+      background: oklch(24% 0.035 70);
+      color: oklch(92% 0.035 82);
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .codeblock code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    .layers {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .layer {
+      min-height: 210px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: linear-gradient(180deg, oklch(99% 0.014 84), oklch(94% 0.027 84));
+    }
+
+    .layer .tag {
+      color: var(--brick);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .layer h3 {
+      margin-top: 22px;
+      font-size: 24px;
+    }
+
+    .compare {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 22px;
+      background: var(--panel);
+      font-size: 15px;
+    }
+
+    .compare th,
+    .compare td {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .compare th {
+      color: var(--blueprint);
+      background: oklch(94% 0.03 82);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .compare tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .callout {
+      padding: 24px;
+      border-left: 8px solid var(--brick);
+      border-radius: 18px 24px 24px 18px;
+      background: oklch(96% 0.04 76);
+      font-size: 18px;
+    }
+
+    .footer {
+      margin-top: 72px;
+      padding-top: 24px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+    }
+
+    @media (max-width: 860px) {
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .section-head {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .span-7,
+      .span-6,
+      .span-5,
+      .span-4 {
+        grid-column: 1 / -1;
+      }
+
+      .layers {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      .toc a {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <span class="kicker">MemOS / Local Agent Memory</span>
+        <h1>本地记忆插件如何工作</h1>
+        <p>
+          基于公众号发布介绍和本地源码重新梳理：MemOS Local Plugin 2.0 要补的是通用大模型与真实用户之间的“最后一公里”，把 Agent 的每次执行加工成可审计、可归因、可复用的学习资产。
+        </p>
+      </div>
+      <aside class="hero-card">
+        <strong>源码位置</strong>
+        <code>D:\GitHub\memory-research\MemOS\apps\memos-local-plugin</code>
+        <p class="lead">
+          它不是 Claude Code Hook 插件，而是给 Agent Host 使用的本地记忆插件。
+        </p>
+      </aside>
+    </header>
+
+    <nav class="toc" aria-label="页面导航">
+      <a href="#relationship">关系定位</a>
+      <a href="#article">公众号主线</a>
+      <a href="#install">安装目录</a>
+      <a href="#openclaw">OpenClaw 接入</a>
+      <a href="#turn">单轮流程</a>
+      <a href="#layers">记忆层级</a>
+      <a href="#retrieval">三层检索</a>
+      <a href="#scoring">评分到 Skill</a>
+      <a href="#compare">对比 claude-mem</a>
+      <a href="#check">如何验证</a>
+    </nav>
+
+    <section id="relationship">
+      <div class="section-head">
+        <span class="number">SECTION 01</span>
+        <h2>MemOS 是体系，插件是本地落地形态</h2>
+      </div>
+      <div class="grid">
+        <div class="panel pad span-7">
+          <p class="lead">
+            <code>memos-local-plugin</code> 是 MemOS 仓库中的一个应用包。它把 Reflect2Evolve
+            记忆算法封装成 Agent Host 可以加载的插件，让 Agent 具备跨任务记忆、经验归纳和技能结晶能力。
+          </p>
+          <p>
+            它的中心不是 UI，也不是安装脚本，而是 <code>core/</code> 中的 <code>MemoryCore</code>。
+            Host 差异由 <code>adapters/</code> 吸收，稳定协议放在 <code>agent-contract/</code>。
+          </p>
+        </div>
+        <div class="panel relation span-5">
+          <div class="node">MemOS 仓库<div class="sub">记忆系统总工程</div></div>
+          <div class="arrow">↓</div>
+          <div class="node">apps/memos-local-plugin<div class="sub">本地 Agent 插件</div></div>
+          <div class="arrow">↓</div>
+          <div class="node">OpenClaw / Hermes<div class="sub">真实运行时接入</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="article">
+      <div class="section-head">
+        <span class="number">SECTION 02</span>
+        <h2>公众号介绍的主线：执行即学习</h2>
+      </div>
+      <div class="grid">
+        <div class="panel pad span-5">
+          <p class="lead">
+            文章的核心判断是：缺少的不是知识，而是一套让 Agent 在执行过程中把每一步都学进去的机制。
+          </p>
+          <div class="callout">
+            大模型负责通用推理，MemOS 负责学习你的本地世界。
+          </div>
+        </div>
+        <div class="panel pad span-7">
+          <div class="flow">
+            <div class="step">
+              <div>
+                <b>最后一公里</b>
+                <p>你的代码库、目录结构、命名习惯、历史踩坑，预训练学不到，微调来不及，普通 RAG 又难以沉淀反馈。</p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <b>执行链成为资产</b>
+                <p>动作、观察、反思、结果不再只是临时上下文，而是进入捕获、评分、归纳、抽象、复用流水线。</p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <b>双层反馈回流</b>
+                <p>环境反馈判断“跑没跑通”，用户反馈判断“是不是符合期待”，两者一起影响历史步骤的价值权重。</p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <b>多 Agent 共用核心</b>
+                <p>Hermes Agent 与 OpenClaw 通过轻薄 adapter 接入同一份核心，新的 Agent 也可以复用底层进化记忆引擎。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="section-head">
+        <span class="number">SECTION 03</span>
+        <h2>安装时把代码和记忆数据分开</h2>
+      </div>
+      <div class="grid">
+        <div class="panel pad span-6">
+          <h3>Windows 本地源码安装</h3>
+          <pre class="codeblock"><code>cd D:\GitHub\memory-research\MemOS\apps\memos-local-plugin
+npm install
+npm run build:package
+.\install.ps1 openclaw</code></pre>
+        </div>
+        <div class="panel pad span-6">
+          <h3>公众号给出的快速安装</h3>
+          <pre class="codeblock"><code>curl -fsSL https://raw.githubusercontent.com/MemTensor/MemOS/main/apps/memos-local-plugin/install.sh | bash</code></pre>
+          <p>这条命令适合 macOS / Linux 用户从发布包快速安装；Windows 源码研究仍建议使用 <code>install.ps1</code>。</p>
+        </div>
+        <div class="panel pad span-12">
+          <h3>OpenClaw 运行目录</h3>
+          <pre class="codeblock"><code>~\.openclaw\plugins\memos-local-plugin\   # 插件代码
+~\.openclaw\memos-plugin\config.yaml      # 配置
+~\.openclaw\memos-plugin\data\memos.db    # SQLite 记忆库
+~\.openclaw\memos-plugin\skills\          # 结晶技能
+~\.openclaw\memos-plugin\logs\            # 日志</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="openclaw">
+      <div class="section-head">
+        <span class="number">SECTION 04</span>
+        <h2>OpenClaw 适配器在进程内直接接入 MemoryCore</h2>
+      </div>
+      <div class="grid">
+        <div class="panel pad span-5">
+          <p>
+            OpenClaw 加载插件后进入 <code>adapters/openclaw/index.ts</code>。
+            这个入口会初始化 core、注册工具、绑定 hook，并启动本地 viewer。
+          </p>
+          <div class="callout">
+            Viewer 默认地址：<br />
+            <strong>http://127.0.0.1:18799</strong>
+          </div>
+        </div>
+        <div class="panel pad span-7">
+          <div class="flow">
+            <div class="step">
+              <div>
+                <b>bootstrapMemoryCoreFull</b>
+                <p>加载 <code>~/.openclaw/memos-plugin/config.yaml</code>，初始化存储、模型、pipeline。</p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <b>registerOpenClawTools</b>
+                <p>注册 <code>memory_search</code>、<code>memory_get</code>、<code>memory_timeline</code>、<code>skill_get</code> 等工具。</p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <b>createOpenClawBridge</b>
+                <p>把 <code>before_prompt_build</code>、<code>agent_end</code>、工具结果等 Host 事件映射到 core。</p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <b>startHttpServer</b>
+                <p>启动本地 HTTP / SSE viewer，展示 traces、policies、world model、skills 和日志。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="turn">
+      <div class="section-head">
+        <span class="number">SECTION 05</span>
+        <h2>每轮对话是一次检索、执行、沉淀、提炼循环</h2>
+      </div>
+      <div class="panel pad">
+        <p class="lead">
+          公众号用 Alpine 容器安装 Python 包失败举例：系统不只记“后来修好了”，而是记录每一步尝试、错误、观察和反思，让下次遇到类似环境问题时不用重新试一遍。
+        </p>
+        <div class="flow">
+          <div class="step">
+            <div>
+              <b>before_prompt_build：先召回</b>
+              <p>adapter 提取当前 turn，core 执行 Tier 1 Skill、Tier 2 Trace/Episode、Tier 3 World Model 检索，并把结果渲染成注入上下文。</p>
+            </div>
+          </div>
+          <div class="step">
+            <div>
+              <b>Agent 执行任务</b>
+              <p>模型可以主动调用 memory 工具，也可以调用普通工具。普通工具结果会被记录为 outcome，但不会在当前 LLM step 中途静默注入新上下文。</p>
+            </div>
+          </div>
+          <div class="step">
+            <div>
+              <b>agent_end：再沉淀</b>
+              <p>adapter 收集 assistant 回复、工具调用和结果，core 关闭 episode 并触发 L1 trace 捕获。</p>
+            </div>
+          </div>
+          <div class="step">
+            <div>
+              <b>异步提炼</b>
+              <p>reward 对 trace 回传价值，L2 从高价值重复模式中归纳 policy，L3 压缩环境认知，Skill 模块把稳定策略结晶成可调用能力。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="layers">
+      <div class="section-head">
+        <span class="number">SECTION 06</span>
+        <h2>四层记忆不是摘要堆积，而是经验演化</h2>
+      </div>
+      <div class="layers">
+        <article class="layer">
+          <span class="tag">L1 Trace</span>
+          <h3>具体经历</h3>
+          <p>记录动作、观察、反思和值，作为所有高层记忆的事实地基。</p>
+        </article>
+        <article class="layer">
+          <span class="tag">L2 Policy</span>
+          <h3>跨任务策略</h3>
+          <p>从多个相似任务中归纳“有效做法”，例如测试模式、存储实现模式。</p>
+        </article>
+        <article class="layer">
+          <span class="tag">L3 World</span>
+          <h3>环境认知</h3>
+          <p>压缩项目结构、限制、领域约定，让 Agent 理解“这个项目通常怎么做”。</p>
+        </article>
+        <article class="layer">
+          <span class="tag">Skill</span>
+          <h3>可调用能力</h3>
+          <p>把高支持度、高收益的策略包装成 Skill，在未来任务中直接调用。</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="retrieval">
+      <div class="section-head">
+        <span class="number">SECTION 07</span>
+        <h2>三层按需检索让上下文精打细算</h2>
+      </div>
+      <table class="compare">
+        <thead>
+          <tr>
+            <th>层级</th>
+            <th>召回内容</th>
+            <th>适合时机</th>
+            <th>价值</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Tier 1</td>
+            <td>Skill</td>
+            <td>新任务入口，命中稳定技能</td>
+            <td>直接给 procedure、scope、避坑规则，形成任务骨架</td>
+          </tr>
+          <tr>
+            <td>Tier 2</td>
+            <td>Trace / Episode</td>
+            <td>执行受阻或遇到 edge case</td>
+            <td>补“上次具体怎么解决”的历史步骤</td>
+          </tr>
+          <tr>
+            <td>Tier 3</td>
+            <td>World Model</td>
+            <td>同主题、同项目、同环境任务</td>
+            <td>给项目背景、目录约定、领域画像，跳过重复探索</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="scoring">
+      <div class="section-head">
+        <span class="number">SECTION 08</span>
+        <h2>有用性不是靠直觉，而是一路打分筛出来</h2>
+      </div>
+      <div class="grid">
+        <div class="panel pad span-6">
+          <h3>记录链路：先把执行变成可评分证据</h3>
+          <p>
+            Adapter 把用户输入、assistant 输出、thinking、工具调用和工具结果统一成 turn / trace。
+            L1 trace 先保存“发生了什么”，随后 capture 会为每步补 reflection，并用 <code>alpha</code>
+            衡量这条反思是否忠实、具体、可迁移。
+          </p>
+          <p>
+            任务结束后，reward 模块用 task summary 与用户反馈得到 <code>R_human</code>。
+            这里的 human 不等于每次都要人手工打分，而是“人的目标是否被满足”：显式反馈会进入评分，
+            没有显式反馈时则由 LLM rubric 和保守启发式估计。
+          </p>
+        </div>
+        <div class="panel pad span-6">
+          <h3>召回链路：优先召回已经证明有用的东西</h3>
+          <p>
+            <code>R_human</code> 会沿 episode 反向传播成每条 trace 的 <code>value</code> 和
+            <code>priority</code>。priority 越高，越容易在 Tier 2 被召回；负价值 trace 不会删除，
+            但更适合作为 decision repair 的反例。
+          </p>
+          <p>
+            当多个高价值 trace 形成重复模式，L2 才会归纳 policy；当 policy 的
+            <code>support</code> 和 <code>gain</code> 达标，才可能进一步结晶为 Skill。
+          </p>
+        </div>
+        <div class="panel pad span-12">
+          <table class="compare">
+            <thead>
+              <tr>
+                <th>层级</th>
+                <th>关键分数</th>
+                <th>谁来打分</th>
+                <th>影响</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>L1 Trace</td>
+                <td><code>alpha</code>、<code>value</code>、<code>priority</code></td>
+                <td>LLM judge + reward backprop 自动计算</td>
+                <td>决定哪些历史步骤值得召回，哪些只作为反例保留</td>
+              </tr>
+              <tr>
+                <td>L2 Policy</td>
+                <td><code>support</code>、<code>gain</code>、<code>status</code></td>
+                <td>证据计数 + 对照价值计算</td>
+                <td>决定策略是 candidate、active 还是 archived</td>
+              </tr>
+              <tr>
+                <td>Skill</td>
+                <td><code>eta</code>、<code>trialsPassed</code>、用户正负反馈</td>
+                <td>自动试用结果 + 人类显式反馈混合</td>
+                <td>决定 Skill 是否从 candidate 晋升 active，或因低可靠度归档</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel pad span-12">
+          <div class="callout">
+            简单说：不是纯 human 打分，也不是 agent 自己说了算。用户反馈是强信号；
+            没有用户反馈时，系统用 LLM rubric、公式回传、支持度、收益和试用结果自动估计有用性。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="compare">
+      <div class="section-head">
+        <span class="number">SECTION 09</span>
+        <h2>它和 claude-mem 的侧重点不同</h2>
+      </div>
+      <table class="compare">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>claude-mem</th>
+            <th>memos-local-plugin</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>接入对象</td>
+            <td>Claude Code / Cursor / Gemini 等 Hook 型环境</td>
+            <td>OpenClaw / Hermes 这类 Agent Host</td>
+          </tr>
+          <tr>
+            <td>注入时机</td>
+            <td>SessionStart 注入最近 observation timeline</td>
+            <td>Turn start 执行三层检索后注入 InjectionPacket</td>
+          </tr>
+          <tr>
+            <td>记忆形态</td>
+            <td>Observation + Session Summary 为主</td>
+            <td>L1 Trace + L2 Policy + L3 World Model + Skill</td>
+          </tr>
+          <tr>
+            <td>核心价值</td>
+            <td>让编码助手跨会话记住项目历史</td>
+            <td>让 Agent 从重复任务中沉淀策略并改变未来行为</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="check">
+      <div class="section-head">
+        <span class="number">SECTION 10</span>
+        <h2>验证链路是否跑通</h2>
+      </div>
+      <div class="grid">
+        <div class="panel pad span-4">
+          <h3>1. 看目录</h3>
+          <p>确认 <code>~\.openclaw\plugins\memos-local-plugin</code> 和 <code>~\.openclaw\memos-plugin</code> 已生成。</p>
+        </div>
+        <div class="panel pad span-4">
+          <h3>2. 开 viewer</h3>
+          <p>访问 <code>http://127.0.0.1:18799</code>，查看 Overview、Traces、Retrieval、Logs。</p>
+        </div>
+        <div class="panel pad span-4">
+          <h3>3. 做连续任务</h3>
+          <p>用同一个小项目做 6 到 10 轮相似开发任务，观察 L1、L2、L3、Skill 是否逐步出现。</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>
+        本页面由本地源码阅读整理：<code>MemOS/apps/memos-local-plugin</code>。
+        详细文字版见同目录 Markdown：<code>memos-local-plugin使用流程说明.md</code>。
+      </p>
+    </footer>
+  </main>
+</body>
+</html>
